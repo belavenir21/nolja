@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>머함?</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
+        button {
+            padding: 20px 40px;
+            font-size: 24px;
+            background-color: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #c0392b;
+            transition: 0.1s;
+        }
+        button:active {
+            transform: translateY(5px);
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body>
+
+    <button onclick="startHell()">킥 눌러바ㅋ</button>
+
+    <script>
+        function startHell() {
+            // 반복 횟수 설정 (현재 100번으로 설정됨)
+            // 테스트할 때는 숫자를 5 정도로 줄여서 하시는 게 정신 건강에 좋습니다.
+            const repeatCount = 100; 
+
+            for (let i = 1; i <= repeatCount; i++) {
+                alert(i + "녕하세욬ㅋㅋ");
+            }
+
+            // 반복문이 다 끝나면 뜨는 메시지
+            alert("잘가게.");
+        }
+    </script>
+
+</body>
+</html>
