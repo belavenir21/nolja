@@ -236,7 +236,7 @@
             const [showRoleModal, setShowRoleModal] = useState(false);
             const [showResultModal, setShowResultModal] = useState(false);
 
-            // ⚙️ 게임 설정 상태 (기본값: 8분 / 20초)
+            // ⚙️ 게임 설정 상태
             const [gameTimeOpt, setGameTimeOpt] = useState(8);
             const [turnTimeOpt, setTurnTimeOpt] = useState(20);
 
@@ -395,7 +395,6 @@
                 if (roomData.status === 'playing' && roomData.gameState?.targetPlayer === userId) {
                     handlePassTurn();
                 }
-                // 질문자가 질문하면 턴 넘김 처리는 지목 기능이 있으므로 여기선 생략
             };
 
             const copyCode = () => { navigator.clipboard ? navigator.clipboard.writeText(roomId).then(() => alert('코드 복사됨')) : prompt("방 코드", roomId); };
@@ -404,17 +403,29 @@
 
             if (view === 'lobby') {
                 return (
-                    <div className="spy-bg flex items-center justify-center p-6">
-                        <div className="w-full max-w-sm glass-card p-8 rounded-3xl text-center">
-                            <div className="mb-6"><div className="text-6xl mb-4 drop-shadow-lg">🕵️</div><h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500">SPYFALL</h1></div>
-                            <div className="space-y-4">
-                                <input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="닉네임" className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white text-center text-lg focus:outline-none focus:ring-2 focus:ring-red-500/50" />
-                                {error && <div className="text-red-400 text-sm">{error}</div>}
+                    <div className="spy-bg flex items-center justify-center p-4 min-h-screen overflow-hidden">
+                        <div className="w-full max-w-sm glass-card p-6 rounded-3xl text-center shadow-2xl relative z-10">
+                            
+                            <div className="mb-6">
+                                <div className="text-5xl mb-2 drop-shadow-lg animate-bounce">🕵️</div>
+                                <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-xs text-gray-400 font-bold block text-left ml-2 mb-1">닉네임</label>
+                                    <input 
+                                        value={nickname} 
+                                        onChange={e => setNickname(e.target.value)} 
+                                        placeholder="이름을 입력하세요" 
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all placeholder-gray-600" 
+                                    />
+                                </div>
                                 
-                                <div className="bg-white/5 rounded-2xl p-4 text-left space-y-3 border border-white/5">
+                                <div className="bg-white/5 rounded-xl p-3 text-left space-y-2 border border-white/5">
                                     <div className="flex justify-between items-center">
-                                        <label className="text-xs text-gray-400 font-bold uppercase">전체 시간</label>
-                                        <select value={gameTimeOpt} onChange={e => setGameTimeOpt(Number(e.target.value))} className="bg-black/40 text-white text-sm rounded-lg px-2 py-1 outline-none border border-white/10">
+                                        <label className="text-xs text-gray-400 font-bold flex items-center gap-1"><i data-lucide="clock" className="w-3 h-3"></i> 전체 게임</label>
+                                        <select value={gameTimeOpt} onChange={e => setGameTimeOpt(Number(e.target.value))} className="bg-black/40 text-white text-xs rounded px-2 py-1 outline-none border border-white/10 w-20">
                                             <option value={5}>5분</option>
                                             <option value={8}>8분</option>
                                             <option value={10}>10분</option>
@@ -423,8 +434,8 @@
                                         </select>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <label className="text-xs text-gray-400 font-bold uppercase">턴 제한 시간</label>
-                                        <select value={turnTimeOpt} onChange={e => setTurnTimeOpt(Number(e.target.value))} className="bg-black/40 text-white text-sm rounded-lg px-2 py-1 outline-none border border-white/10">
+                                        <label className="text-xs text-gray-400 font-bold flex items-center gap-1"><i data-lucide="hourglass" className="w-3 h-3"></i> 턴 시간</label>
+                                        <select value={turnTimeOpt} onChange={e => setTurnTimeOpt(Number(e.target.value))} className="bg-black/40 text-white text-xs rounded px-2 py-1 outline-none border border-white/10 w-20">
                                             <option value={20}>20초</option>
                                             <option value={30}>30초</option>
                                             <option value={40}>40초</option>
@@ -434,10 +445,34 @@
                                     </div>
                                 </div>
 
-                                <button onClick={handleCreateRoom} className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white py-4 rounded-2xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 hover:brightness-110 transition-all">방 만들기</button>
-                                <div className="flex gap-3 pt-2">
-                                    <input value={roomId} onChange={e => setRoomId(e.target.value.toUpperCase())} placeholder="코드" maxLength={4} className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-4 text-center uppercase text-white font-bold text-lg focus:outline-none" />
-                                    <button onClick={handleJoinRoom} className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white py-8 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 hover:brightness-110 transition-all">참가</button>
+                                {error && <div className="text-red-400 text-xs font-bold bg-red-500/10 py-2 rounded-lg animate-pulse">{error}</div>}
+                                
+                                <div className="pt-2 space-y-3">
+                                    <button onClick={handleCreateRoom} className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white py-3 rounded-xl font-bold shadow-lg shadow-red-900/20 active:scale-95 transition-all flex items-center justify-center gap-2">
+                                        <i data-lucide="plus" className="w-5 h-5"></i> 새로운 방 만들기
+                                    </button>
+
+                                    <div className="relative flex items-center py-1">
+                                        <div className="flex-grow border-t border-white/10"></div>
+                                        <span className="flex-shrink-0 mx-2 text-gray-500 text-xs">OR</span>
+                                        <div className="flex-grow border-t border-white/10"></div>
+                                    </div>
+
+                                    <div className="flex gap-2 h-14">
+                                        <input 
+                                            value={roomId} 
+                                            onChange={e => setRoomId(e.target.value.toUpperCase())} 
+                                            placeholder="A1B2" 
+                                            maxLength={4} 
+                                            className="w-24 bg-black/40 border border-white/10 rounded-xl px-2 text-center uppercase text-white font-black text-xl focus:outline-none focus:border-blue-500 transition-all placeholder-gray-700" 
+                                        />
+                                        <button 
+                                            onClick={handleJoinRoom} 
+                                            className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-black text-xl shadow-lg shadow-blue-900/30 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <i data-lucide="log-in" className="w-6 h-6"></i> 입장하기
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -453,13 +488,11 @@
                 const me = roomData.players ? roomData.players[userId] : null;
                 const gameState = roomData.gameState;
                 
-                // 설정된 시간 사용 (없으면 기본값)
                 const gameDuration = roomData.settings?.gameDuration || 8 * 60 * 1000;
                 const turnDuration = roomData.settings?.turnDuration || 20 * 1000;
 
                 if (!me) return <div className="spy-bg flex items-center justify-center flex-col p-4 text-center text-white"><h2 className="text-xl font-bold mb-4">연결 끊김</h2><button onClick={leaveRoomCleanup} className="bg-white/20 px-6 py-3 rounded-xl">나가기</button></div>;
 
-                // 채팅 상태 계산
                 const isPlaying = roomData.status === 'playing';
                 const isMyTurn = gameState?.turnPlayer === userId;
                 const isMyTargetTurn = gameState?.targetPlayer === userId;
@@ -535,6 +568,13 @@
                                         <button onClick={() => setShowRoleModal(false)} className="mt-8 w-full bg-white/10 hover:bg-white/20 py-3 rounded-xl font-bold text-white border border-white/10">닫기</button>
                                     </div>
                                 </div>
+                            )}
+
+                            {/* 역할 확인 버튼 */}
+                            {roomData.status === 'playing' && (
+                                <button onClick={() => setShowRoleModal(true)} className="w-full mb-4 bg-white/5 hover:bg-white/10 p-3 rounded-xl font-bold text-gray-300 text-sm flex items-center justify-center gap-2 border border-white/5 transition-colors">
+                                    <i data-lucide="id-card" className="w-4 h-4"></i> 내 역할 카드 다시 보기
+                                </button>
                             )}
 
                             {/* 게임 영역 (플레이어 목록) */}
