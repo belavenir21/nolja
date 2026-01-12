@@ -10,13 +10,18 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .spy-gradient { background: linear-gradient(135deg, #1a1c2c 0%, #4a192c 100%); }
+    </style>
 </head>
-<body>
+<body class="bg-gray-900 text-white">
     <div id="root"></div>
     
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
 
+        // 🔥 여기에 본인의 Firebase 설정을 붙여넣으세요 🔥
         const firebaseConfig = {
             apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM",
             authDomain: "spyfall-b107.firebaseapp.com",
@@ -28,11 +33,13 @@
             measurementId: "G-HYQR22H174"
         };
 
+        // Firebase 초기화 (한 번만 실행되도록 체크)
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
         const database = firebase.database();
 
+        // 게임 데이터
         const GAME_DATA = {
             hospital: { place: "🏥 종합병원", roles: ["외과 의사", "수간호사", "응급 환자", "병원장", "구급대원", "약사", "청소부", "보호자"] },
             school: { place: "🏫 고등학교", roles: ["담임 선생님", "전교 회장", "체육 선생님", "교장 선생님", "매점 이모", "잠자는 학생", "전학생", "양호 선생님"] },
@@ -62,69 +69,109 @@
         }
 
         function App() {
-            const getUserId = () => {
+            // 유저 ID 관리
+            const [userId] = useState(() => {
                 const stored = localStorage.getItem('spyfall_user_id');
                 if (stored) return stored;
                 const newId = generateUserId();
                 localStorage.setItem('spyfall_user_id', newId);
                 return newId;
-            };
+            });
 
-            const [userId] = useState(getUserId);
-            const [view, setView] = useState('lobby');
+            // 상태 관리
+            const [view, setView] = useState('lobby'); // lobby, room, game
             const [roomId, setRoomId] = useState('');
-            const [nickname, setNickname] = useState('');
+            const [nickname, setNickname] = useState(localStorage.getItem('spyfall_nickname') || '');
             const [roomData, setRoomData] = useState(null);
             const [error, setError] = useState('');
 
+            // 닉네임 저장
+            useEffect(() => {
+                if (nickname) localStorage.setItem('spyfall_nickname', nickname);
+            }, [nickname]);
+
+            // 새로고침 시 방 재접속 시도
+            useEffect(() => {
+                const savedRoomId = localStorage.getItem('spyfall_current_room');
+                if (savedRoomId && view === 'lobby') {
+                    // 방 정보가 있는지 확인 후 재접속
+                    database.ref('rooms/' + savedRoomId).once('value', snapshot => {
+                        if (snapshot.exists()) {
+                            setRoomId(savedRoomId);
+                            setView('room'); // 일단 room으로 보내고 리스너가 game으로 보냄
+                        } else {
+                            localStorage.removeItem('spyfall_current_room');
+                        }
+                    });
+                }
+            }, []);
+
+            // 방 데이터 리스너 & 자동 퇴장 설정 (핵심 기능!)
             useEffect(() => {
                 if (!roomId) return;
-
-                const roomRef = database.ref('rooms/' + roomId);
                 
+                // 1. 방 정보 구독
+                const roomRef = database.ref('rooms/' + roomId);
                 const listener = roomRef.on('value', (snapshot) => {
                     const data = snapshot.val();
                     if (data) {
                         setRoomData(data);
-                        if (data.status === 'playing' && view !== 'game') {
-                            setView('game');
-                        } else if (data.status === 'waiting' && view === 'game') {
-                            setView('room');
-                        }
+                        if (data.status === 'playing') setView('game');
+                        else if (data.status === 'waiting') setView('room');
+                        
+                        // 현재 접속 중임을 로컬스토리지에 저장 (새로고침 대비)
+                        localStorage.setItem('spyfall_current_room', roomId);
                     } else {
-                        alert('방이 삭제되었습니다');
-                        setView('lobby');
-                        setRoomId('');
+                        // 방이 사라짐
+                        alert('방이 종료되었습니다.');
+                        leaveRoomCleanup();
                     }
                 });
 
+                // 2. 🔥 자동 퇴장(onDisconnect) 설정 🔥
+                // 내 플레이어 데이터 경로
+                const myPlayerRef = database.ref('rooms/' + roomId + '/players/' + userId);
+                
+                // 연결 끊기면(창 닫으면) 내 데이터 삭제 예약
+                myPlayerRef.onDisconnect().remove();
+
+                // 컴포넌트 언마운트 시(나가기 버튼 등) 리스너 해제
                 return () => {
                     roomRef.off('value', listener);
                 };
-            }, [roomId, view]);
+            }, [roomId, userId]);
+
+            // 방 나가기/종료 시 정리 함수
+            const leaveRoomCleanup = async () => {
+                if (roomId) {
+                    // 1. 예약된 자동 퇴장 취소 (이미 나갈 거니까)
+                    const myPlayerRef = database.ref('rooms/' + roomId + '/players/' + userId);
+                    myPlayerRef.onDisconnect().cancel(); 
+
+                    // 2. 실제 데이터 삭제
+                    await myPlayerRef.remove();
+                    
+                    // 3. 로컬 상태 정리
+                    localStorage.removeItem('spyfall_current_room');
+                    setRoomId('');
+                    setRoomData(null);
+                    setView('lobby');
+                }
+            };
 
             const handleCreateRoom = async () => {
-                if (!nickname.trim()) { 
-                    setError('닉네임을 입력하세요'); 
-                    return; 
-                }
+                if (!nickname.trim()) return setError('닉네임을 입력하세요');
                 
                 const newRoomId = generateRoomCode();
-                const newPlayer = {
-                    uid: userId, 
-                    name: nickname, 
-                    role: null, 
-                    isSpy: false 
-                };
+                const newPlayer = { uid: userId, name: nickname, role: null, isSpy: false };
 
                 const newRoomData = {
                     hostId: userId,
-                    players: {},
+                    players: { [userId]: newPlayer },
                     status: 'waiting',
                     createdAt: Date.now(),
                     locationName: null
                 };
-                newRoomData.players[userId] = newPlayer;
 
                 try {
                     await database.ref('rooms/' + newRoomId).set(newRoomData);
@@ -132,15 +179,12 @@
                     setView('room');
                     setError('');
                 } catch (e) {
-                    setError('방 생성 실패');
+                    setError('방 생성 실패: ' + e.message);
                 }
             };
 
             const handleJoinRoom = async () => {
-                if (!nickname.trim() || !roomId.trim()) { 
-                    setError('닉네임과 방 코드를 입력하세요'); 
-                    return; 
-                }
+                if (!nickname.trim() || !roomId.trim()) return setError('닉네임과 방 코드를 입력하세요');
                 
                 const targetId = roomId.toUpperCase();
                 
@@ -148,271 +192,202 @@
                     const snapshot = await database.ref('rooms/' + targetId).once('value');
                     const data = snapshot.val();
                     
-                    if (!data) { 
-                        setError('방이 없습니다'); 
-                        return; 
-                    }
-                    if (data.status === 'playing') { 
-                        setError('게임 진행 중'); 
-                        return; 
-                    }
+                    if (!data) return setError('존재하지 않는 방입니다');
+                    if (data.status === 'playing') return setError('이미 게임이 진행 중입니다');
                     
                     const players = data.players || {};
-                    const playerCount = Object.keys(players).length;
-                    if (playerCount >= 12) { 
-                        setError('방이 꽉 찼습니다'); 
-                        return; 
-                    }
+                    if (Object.keys(players).length >= 12) return setError('방이 꽉 찼습니다');
 
-                    const newPlayer = {
-                        uid: userId,
-                        name: nickname,
-                        role: null,
-                        isSpy: false
-                    };
-
+                    // 플레이어 추가
+                    const newPlayer = { uid: userId, name: nickname, role: null, isSpy: false };
                     await database.ref('rooms/' + targetId + '/players/' + userId).set(newPlayer);
 
                     setRoomId(targetId);
                     setView('room');
                     setError('');
                 } catch (e) {
-                    setError('입장 실패');
+                    setError('입장 실패: ' + e.message);
                 }
             };
 
             const handleStartGame = async () => {
                 if (!roomData || roomData.hostId !== userId) return;
                 
-                const playersObj = roomData.players || {};
-                const players = Object.values(playersObj);
-                
-                if (players.length < 3) { 
-                    alert('최소 3명 필요'); 
-                    return; 
-                }
+                const players = Object.values(roomData.players || {});
+                if (players.length < 3) return alert('최소 3명이 필요합니다');
 
                 const location = getRandomLocation();
-                const roles = location.roles.slice();
-                const spyIndex = Math.floor(Math.random() * players.length);
-                
-                const updatedPlayers = {};
-                
-                for (let i = 0; i < players.length; i++) {
-                    const p = players[i];
-                    if (i === spyIndex) {
-                        updatedPlayers[p.uid] = {
-                            uid: p.uid,
-                            name: p.name,
-                            role: 'SPY',
-                            isSpy: true
-                        };
-                    } else {
-                        let role = "시민";
-                        if (roles.length > 0) {
-                            const randomIndex = Math.floor(Math.random() * roles.length);
-                            role = roles[randomIndex];
-                            roles.splice(randomIndex, 1);
-                        }
-                        updatedPlayers[p.uid] = {
-                            uid: p.uid,
-                            name: p.name,
-                            role: role,
-                            isSpy: false
-                        };
-                    }
-                }
+                let roles = [...location.roles];
+                // 역할 셔플
+                roles.sort(() => Math.random() - 0.5);
 
-                const updates = {
+                const spyIndex = Math.floor(Math.random() * players.length);
+                const updatedPlayers = {};
+
+                players.forEach((p, index) => {
+                    let playerRole = "시민";
+                    let isSpy = false;
+
+                    if (index === spyIndex) {
+                        playerRole = "SPY";
+                        isSpy = true;
+                    } else if (roles.length > 0) {
+                        playerRole = roles.pop();
+                    }
+
+                    updatedPlayers[p.uid] = {
+                        ...p,
+                        role: playerRole,
+                        isSpy: isSpy
+                    };
+                });
+
+                await database.ref('rooms/' + roomId).update({
                     status: 'playing',
                     locationName: location.place,
                     players: updatedPlayers
-                };
-
-                await database.ref('rooms/' + roomId).update(updates);
+                });
             };
 
-            const handleReset = async () => {
+            const handleResetGame = async () => {
                 if (!roomData || roomData.hostId !== userId) return;
                 
-                const playersObj = roomData.players || {};
-                const players = Object.values(playersObj);
+                const players = Object.values(roomData.players || {});
                 const resetPlayers = {};
                 
-                for (let i = 0; i < players.length; i++) {
-                    const p = players[i];
-                    resetPlayers[p.uid] = {
-                        uid: p.uid,
-                        name: p.name,
-                        role: null,
-                        isSpy: false
-                    };
-                }
+                players.forEach(p => {
+                    resetPlayers[p.uid] = { ...p, role: null, isSpy: false };
+                });
 
-                const updates = {
+                await database.ref('rooms/' + roomId).update({
                     status: 'waiting',
                     locationName: null,
                     players: resetPlayers
-                };
-
-                await database.ref('rooms/' + roomId).update(updates);
+                });
             };
 
             const copyCode = () => {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(roomId).then(() => {
-                        alert('복사됨: ' + roomId);
-                    }).catch(() => {
-                        prompt('복사하세요:', roomId);
-                    });
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(roomId).then(() => alert('방 코드 복사 완료!'));
                 } else {
-                    prompt('복사하세요:', roomId);
+                    prompt("방 코드:", roomId);
                 }
             };
 
+            // --- UI 렌더링 ---
             if (view === 'lobby') {
                 return (
-                    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-                        <div className="max-w-md w-full space-y-6">
-                            <div className="text-center space-y-3">
-                                <div className="text-7xl">🕵️</div>
-                                <h1 className="text-6xl font-black text-white tracking-tight">SPYFALL</h1>
-                                <p className="text-purple-300 text-lg">스파이를 찾아라</p>
+                    <div className="min-h-screen spy-gradient flex items-center justify-center p-4">
+                        <div className="max-w-md w-full space-y-8 text-center">
+                            <div>
+                                <div className="text-6xl mb-2">🕵️</div>
+                                <h1 className="text-5xl font-black tracking-tighter">SPYFALL</h1>
+                                <p className="text-gray-400">실시간 온라인 멀티플레이</p>
                             </div>
+                            
+                            <div className="bg-white/10 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-white/10">
+                                <input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="닉네임 입력" className="w-full bg-black/30 border border-white/20 rounded-xl px-4 py-3 text-white mb-4 focus:outline-none focus:border-red-500 transition" />
+                                
+                                {error && <div className="bg-red-500/20 text-red-200 text-sm p-2 rounded mb-4">{error}</div>}
 
-                            <input
-                                value={nickname}
-                                onChange={(e) => setNickname(e.target.value)}
-                                placeholder="닉네임"
-                                className="w-full px-6 py-4 bg-white/10 backdrop-blur border-2 border-white/20 rounded-2xl text-white text-lg placeholder-white/50 focus:outline-none focus:border-purple-400"
-                            />
-
-                            {error && <div className="bg-red-500/20 border border-red-400 rounded-xl p-3 text-red-200 text-center">{error}</div>}
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <button onClick={handleCreateRoom} className="bg-gradient-to-br from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-6 rounded-2xl shadow-lg transform hover:scale-105 transition">
-                                    방 만들기
-                                </button>
-                                <button onClick={() => setView('join')} className="bg-gradient-to-br from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold py-6 rounded-2xl shadow-lg transform hover:scale-105 transition">
-                                    참가하기
-                                </button>
+                                <button onClick={handleCreateRoom} className="w-full bg-red-600 hover:bg-red-700 py-4 rounded-xl font-bold text-lg mb-3 shadow-lg transition transform active:scale-95">방 만들기</button>
+                                
+                                <div className="flex gap-2">
+                                    <input value={roomId} onChange={e => setRoomId(e.target.value.toUpperCase())} placeholder="코드" maxLength={4} className="w-1/3 bg-black/30 border border-white/20 rounded-xl px-4 py-3 text-white text-center tracking-widest uppercase focus:outline-none focus:border-blue-500" />
+                                    <button onClick={handleJoinRoom} className="w-2/3 bg-blue-600 hover:bg-blue-700 py-3 rounded-xl font-bold shadow-lg transition transform active:scale-95">참가하기</button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 );
             }
 
-            if (view === 'join') {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
-                        <div className="max-w-md w-full space-y-4">
-                            <h2 className="text-4xl font-bold text-white text-center mb-6">방 참가</h2>
-                            <input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="닉네임" className="w-full px-6 py-4 bg-white/10 border-2 border-white/20 rounded-xl text-white" />
-                            <input value={roomId} onChange={(e) => setRoomId(e.target.value.toUpperCase())} placeholder="방 코드 (4자리)" maxLength={4} className="w-full px-6 py-4 bg-white/10 border-2 border-white/20 rounded-xl text-white text-center text-2xl tracking-widest uppercase" />
-                            {error && <div className="text-red-300 text-center">{error}</div>}
-                            <button onClick={handleJoinRoom} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 rounded-xl">입장</button>
-                            <button onClick={() => setView('lobby')} className="w-full text-white/70 hover:text-white">취소</button>
-                        </div>
-                    </div>
-                );
-            }
-
-            if (view === 'room' && roomData) {
+            if (view === 'room' || view === 'game') {
+                if (!roomData) return <div className="min-h-screen spy-gradient flex items-center justify-center">로딩 중...</div>;
+                
+                const players = Object.values(roomData.players || {});
                 const isHost = roomData.hostId === userId;
-                const playersObj = roomData.players || {};
-                const players = Object.values(playersObj);
+                const me = roomData.players[userId];
 
                 return (
-                    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 p-4">
-                        <div className="max-w-2xl mx-auto pt-12 space-y-6">
-                            <div className="bg-white/10 backdrop-blur rounded-3xl p-8 text-center border-2 border-white/20">
-                                <div className="text-sm text-white/60 mb-2">방 코드</div>
-                                <div className="text-6xl font-black text-white tracking-widest mb-4">{roomId}</div>
-                                <button onClick={copyCode} className="bg-emerald-500 hover:bg-emerald-600 px-6 py-2 rounded-xl text-white font-bold">복사</button>
-                            </div>
-
-                            <div className="bg-white/10 backdrop-blur rounded-3xl p-6 border-2 border-white/20">
-                                <h3 className="text-xl font-bold text-white mb-4">참가자 ({players.length}명)</h3>
-                                <div className="grid grid-cols-2 gap-3">
-                                    {players.map((p, i) => (
-                                        <div key={i} className="bg-white/10 rounded-xl p-4 text-white font-medium text-center">
-                                            {p.name} {p.uid === userId ? '👤' : ''} {p.uid === roomData.hostId ? '👑' : ''}
-                                        </div>
-                                    ))}
+                    <div className="min-h-screen spy-gradient p-4">
+                        <div className="max-w-lg mx-auto pt-8 space-y-6">
+                            {/* 상단 바 */}
+                            <div className="flex justify-between items-center bg-black/30 p-4 rounded-2xl border border-white/10">
+                                <div>
+                                    <span className="text-xs text-gray-400 block">ROOM CODE</span>
+                                    <span className="text-2xl font-black text-yellow-400 tracking-widest">{roomId}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={copyCode} className="bg-white/10 p-2 rounded-lg hover:bg-white/20">📋</button>
+                                    <button onClick={leaveRoomCleanup} className="bg-red-900/50 p-2 rounded-lg hover:bg-red-900/80 text-red-200 text-xs">나가기</button>
                                 </div>
                             </div>
 
-                            {isHost ? (
-                                <button onClick={handleStartGame} disabled={players.length < 3} className="w-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 disabled:opacity-50 text-white font-bold py-5 rounded-2xl text-xl">
-                                    게임 시작
-                                </button>
-                            ) : (
-                                <div className="text-center text-yellow-300 text-lg">방장이 시작할 때까지 대기 중...</div>
-                            )}
-                        </div>
-                    </div>
-                );
-            }
-
-            if (view === 'game' && roomData) {
-                const playersObj = roomData.players || {};
-                const players = Object.values(playersObj);
-                let me = null;
-                for (let i = 0; i < players.length; i++) {
-                    if (players[i].uid === userId) {
-                        me = players[i];
-                        break;
-                    }
-                }
-                const isHost = roomData.hostId === userId;
-
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-rose-900 to-slate-900 p-4">
-                        <div className="max-w-2xl mx-auto pt-12 space-y-6">
-                            {me && (
-                                <div className={me.isSpy ? 'bg-gradient-to-br from-red-600 to-rose-700 rounded-3xl p-8 text-center border-4 border-white/30 shadow-2xl' : 'bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 text-center border-4 border-white/30 shadow-2xl'}>
-                                    <div className="text-6xl mb-4">{me.isSpy ? '🕵️' : '🎭'}</div>
+                            {/* 게임 화면 */}
+                            {view === 'game' && me ? (
+                                <div className={`relative overflow-hidden rounded-3xl p-8 text-center shadow-2xl border-4 ${me.isSpy ? 'bg-red-900 border-red-500' : 'bg-blue-900 border-blue-500'}`}>
+                                    <div className="text-6xl mb-4">{me.isSpy ? '🤫' : '📍'}</div>
+                                    <h2 className="text-2xl font-bold mb-2">{me.isSpy ? '당신은 스파이!' : '당신의 역할'}</h2>
+                                    
                                     {me.isSpy ? (
-                                        <div>
-                                            <div className="text-3xl font-black text-white mb-2">당신은 스파이!</div>
-                                            <div className="text-white/80">장소를 모릅니다. 들키지 말고 알아내세요!</div>
-                                        </div>
+                                        <p className="text-red-200 font-medium">장소를 모릅니다.<br/>대화를 듣고 눈치껏 행동하세요!</p>
                                     ) : (
                                         <div>
-                                            <div className="text-white/80 text-sm mb-1">당신의 역할</div>
-                                            <div className="text-4xl font-black text-white mb-4">{me.role}</div>
-                                            <div className="border-t-2 border-white/30 pt-4">
-                                                <div className="text-white/80 text-sm mb-1">장소</div>
-                                                <div className="text-3xl font-bold text-white">{roomData.locationName}</div>
+                                            <div className="text-4xl font-black text-white mb-6">{me.role}</div>
+                                            <div className="border-t border-white/20 pt-4">
+                                                <p className="text-xs text-blue-200 mb-1">현재 장소</p>
+                                                <p className="text-3xl font-bold text-yellow-300">{roomData.locationName}</p>
                                             </div>
                                         </div>
                                     )}
                                 </div>
+                            ) : (
+                                // 대기 화면
+                                <div className="bg-white/10 backdrop-blur rounded-3xl p-8 text-center border border-white/10">
+                                    <div className="text-4xl mb-4">⏳</div>
+                                    <h2 className="text-xl font-bold mb-2">게임 대기 중</h2>
+                                    <p className="text-gray-400 text-sm">참가자가 모두 모이면 시작하세요</p>
+                                </div>
                             )}
 
-                            <div className="bg-white/10 backdrop-blur rounded-3xl p-6 border-2 border-white/20">
-                                <h3 className="text-xl font-bold text-white mb-4">플레이어</h3>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {players.map((p, i) => (
-                                        <div key={i} className="bg-white/10 rounded-xl p-3 text-white text-center font-medium">{p.name}</div>
+                            {/* 참가자 목록 */}
+                            <div className="bg-black/20 rounded-3xl p-6 border border-white/5">
+                                <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase">참가자 ({players.length}명)</h3>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {players.map(p => (
+                                        <div key={p.uid} className={`p-3 rounded-xl text-center text-sm font-medium transition ${p.uid === userId ? 'bg-white text-black' : 'bg-white/10 text-gray-300'}`}>
+                                            {p.name} {p.uid === roomData.hostId && '👑'}
+                                        </div>
                                     ))}
                                 </div>
                             </div>
 
+                            {/* 방장 컨트롤 */}
                             {isHost && (
-                                <button onClick={handleReset} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl">
-                                    게임 종료
-                                </button>
+                                <div className="fixed bottom-6 left-0 right-0 px-4 max-w-lg mx-auto">
+                                    {view === 'room' ? (
+                                        <button onClick={handleStartGame} disabled={players.length < 3} className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:bg-gray-600 text-white font-bold py-4 rounded-2xl shadow-xl text-lg transition">
+                                            게임 시작
+                                        </button>
+                                    ) : (
+                                        <button onClick={handleResetGame} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 rounded-2xl shadow-xl">
+                                            게임 종료 / 다시 하기
+                                        </button>
+                                    )}
+                                </div>
                             )}
+                            <div className="h-20"></div> {/* 하단 여백 */}
                         </div>
                     </div>
                 );
             }
 
-            return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">Loading...</div>;
+            return null;
         }
 
-        ReactDOM.render(React.createElement(App), document.getElementById('root'));
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
