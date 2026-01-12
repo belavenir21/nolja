@@ -55,6 +55,9 @@
             background-position: right 0.5rem center;
             background-size: 1em;
         }
+        /* 로딩 스피너 */
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #3b82f6; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -312,7 +315,6 @@
                 if (roomData?.status === 'playing' && roomData.gameState) {
                     const { turnStartTime, turnPlayer, targetPlayer } = roomData.gameState;
                     
-                    // turnStartTime이 존재하고 변경되었을 때만 실행
                     if (turnStartTime && turnStartTime > lastTurnTimeRef.current) {
                         lastTurnTimeRef.current = turnStartTime;
                         
@@ -337,9 +339,11 @@
                         setRoomData(data);
                         localStorage.setItem('spyfall_current_room', roomId);
                     } else {
-                        // 방이 삭제됨
-                        alert('방이 종료되었습니다.');
-                        leaveRoomCleanup();
+                        // 방이 삭제됨 (뷰가 방이면 튕김 처리)
+                        if (view === 'room' || view === 'game') {
+                            alert('방이 종료되었습니다.');
+                            leaveRoomCleanup();
+                        }
                     }
                 });
 
@@ -355,7 +359,7 @@
                     chatRef.off('value', chatListener);
                     myPlayerRef.onDisconnect().cancel();
                 };
-            }, [roomId]);
+            }, [roomId, view]); // view 의존성 추가
 
             const leaveRoomCleanup = async () => {
                 if (roomId) {
@@ -542,7 +546,7 @@
                 return (
                     <div className="spy-bg flex items-center justify-center p-4">
                         <div className="w-full max-w-sm glass-card p-6 rounded-3xl text-center shadow-2xl relative z-10">
-                            <div className="mb-6"><div className="text-5xl mb-2 drop-shadow-lg animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1><p className="text-xs text-white/30 font-mono mt-2">Ver 5.1 No Crash</p></div>
+                            <div className="mb-6"><div className="text-5xl mb-2 drop-shadow-lg animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1><p className="text-xs text-white/30 font-mono mt-2">Ver 5.2 Safe Mode</p></div>
                             <div className="space-y-3">
                                 <div><label className="text-xs text-gray-400 font-bold block text-left ml-2 mb-1">닉네임</label><input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="이름을 입력하세요" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all placeholder-gray-600" /></div>
                                 <div className="bg-white/5 rounded-xl p-3 text-left space-y-2 border border-white/5">
@@ -561,9 +565,10 @@
                 );
             }
 
-            // 🛡️ [수정] 렌더링 중 데이터 검증 (Null Check 강화)
+            // 🛡️ [수정] 렌더링 중 데이터 검증 (Null Check 강화 및 로딩 스피너)
             if (view === 'room' || view === 'game' || view === 'result') {
-                if (!roomData) return <div className="spy-bg flex items-center justify-center text-white">로딩 중...</div>;
+                if (!roomData) return <div className="spy-bg flex items-center justify-center"><div className="spinner"></div><div className="text-white mt-4 font-bold">데이터 로딩 중...</div></div>;
+                
                 const players = Object.values(roomData.players || {});
                 const isHost = roomData.hostId === userId;
                 const me = roomData.players ? roomData.players[userId] : null;
@@ -571,7 +576,8 @@
                 const gameDuration = roomData.settings?.gameDuration || 8 * 60 * 1000;
                 const turnDuration = roomData.settings?.turnDuration || 20 * 1000;
 
-                if (!me) return <div className="spy-bg flex items-center justify-center flex-col p-4 text-center text-white"><h2 className="text-xl font-bold mb-4">연결 끊김</h2><button onClick={leaveRoomCleanup} className="bg-white/20 px-6 py-3 rounded-xl">나가기</button></div>;
+                // 🛡️ 내 정보가 없으면 로비로 튕기기 전에 로딩 화면 유지
+                if (!me) return <div className="spy-bg flex items-center justify-center"><div className="spinner"></div><div className="text-white mt-4 font-bold">플레이어 정보 확인 중...</div></div>;
 
                 const isPlaying = roomData.status === 'playing';
                 const isMyTurn = gameState?.turnPlayer === userId;
@@ -620,13 +626,17 @@
                             {/* 상단바 */}
                             <div className="glass-card p-3 rounded-2xl mb-3 flex justify-between items-center shrink-0">
                                 <div><span className="text-[10px] text-gray-400 font-bold block">ROOM CODE</span><span className="text-2xl font-black text-yellow-400 tracking-widest">{roomId}</span></div>
+                                
+                                {/* 중앙 상태 텍스트 */}
+                                <div className="hidden md:block text-sm font-bold text-white/80 animate-pulse">{statusText}</div>
+
                                 <div className="flex gap-2">
                                     <button onClick={copyCode} className="bg-white/10 px-3 py-1.5 rounded-lg text-sm font-bold text-white border border-white/10">복사</button>
                                     <button onClick={leaveRoomCleanup} className="bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-sm font-bold border border-red-500/20">나가기</button>
                                 </div>
                             </div>
                             
-                            {/* 모바일용 상태 텍스트 (옵션) */}
+                            {/* 모바일용 상태 텍스트 */}
                             {/* <div className="md:hidden text-center text-xs font-bold text-white/70 mb-2">{statusText}</div> */}
 
                             {/* 타이머 - gameState 확인 후 렌더링 */}
