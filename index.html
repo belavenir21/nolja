@@ -316,6 +316,7 @@
         };
 
         function App() {
+            let statusText = "게임 대기 중 ...";
             const [userId] = useState(() => {
                 const stored = localStorage.getItem('spyfall_user_id');
                 if (stored) return stored;
@@ -648,7 +649,6 @@
                 const isMyTargetTurn = gameState?.targetPlayer === userId;
                 let isChatDisabled = false;
                 let chatPlaceholder = "메시지 입력...";
-                let statusText = "게임 대기 중...";
 
                 if (isPlaying && gameState) {
                     if (!gameState.targetPlayer) {
