@@ -12,8 +12,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- 아이콘 -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
@@ -42,14 +40,13 @@
             appId: "1:35799604494:web:9558db68aa6c5347d60b5f",
             measurementId: "G-HYQR22H174"
         };
-        
-        // Firebase 초기화
+
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
         const database = firebase.database();
 
-        // 게임 데이터 (장소 및 직업)
+        // 게임 데이터
         const GAME_DATA = {
             hospital: { place: "🏥 종합병원", roles: ["외과 의사", "수간호사", "응급 환자", "병원장", "구급대원", "약사", "청소부", "보호자"] },
             school: { place: "🏫 고등학교", roles: ["담임 선생님", "전교 회장", "체육 선생님", "교장 선생님", "매점 이모", "잠자는 학생", "전학생", "양호 선생님"] },
@@ -65,7 +62,6 @@
             bank: { place: "🏦 은행", roles: ["은행 강도", "지점장", "창구 직원", "대출 상담 받으러 온 사람", "청원 경찰", "ATM 수리기사", "현금 수송 요원", "VIP 고객"] }
         };
 
-        // --- 유틸리티 함수 ---
         const generateRoomCode = () => Math.random().toString(36).substring(2, 6).toUpperCase();
         const generateUserId = () => 'user_' + Math.random().toString(36).substring(2, 15);
         const getRandomLocation = () => {
@@ -73,9 +69,40 @@
             return GAME_DATA[keys[Math.floor(Math.random() * keys.length)]];
         };
 
-        // --- 메인 앱 컴포넌트 ---
+        // 💬 [수정] 채팅 컴포넌트를 App 밖으로 뺐습니다. (재렌더링 방지)
+        const ChatArea = ({ messages, chatInput, setChatInput, sendMessage }) => {
+            const chatEndRef = useRef(null);
+            
+            useEffect(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, [messages]);
+
+            return (
+                <div className="flex flex-col h-48 bg-black/20 rounded-xl border border-white/10 mt-4">
+                    <div className="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
+                        {messages.length === 0 && <div className="text-white/30 text-center text-xs">채팅을 시작해보세요</div>}
+                        {messages.map((msg, i) => (
+                            <div key={i} className="text-white break-words">
+                                <span className="font-bold text-yellow-400 mr-2">{msg.sender}:</span>
+                                <span className="text-white/90">{msg.text}</span>
+                            </div>
+                        ))}
+                        <div ref={chatEndRef} />
+                    </div>
+                    <form onSubmit={sendMessage} className="p-2 border-t border-white/10 flex gap-2">
+                        <input 
+                            value={chatInput} 
+                            onChange={e => setChatInput(e.target.value)} 
+                            className="flex-1 bg-white/10 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="메시지 입력..." 
+                        />
+                        <button type="submit" className="bg-blue-600 px-3 py-1 rounded text-sm font-bold">전송</button>
+                    </form>
+                </div>
+            );
+        };
+
         function App() {
-            // 유저 상태
             const [userId] = useState(() => {
                 const stored = localStorage.getItem('spyfall_user_id');
                 if (stored) return stored;
@@ -84,31 +111,20 @@
                 return newId;
             });
 
-            // 게임 상태
-            const [view, setView] = useState('lobby'); // lobby, room, game, result
+            const [view, setView] = useState('lobby'); 
             const [roomId, setRoomId] = useState('');
             const [nickname, setNickname] = useState(localStorage.getItem('spyfall_nickname') || '');
             const [roomData, setRoomData] = useState(null);
             const [error, setError] = useState('');
-            
-            // UI 상태
             const [messages, setMessages] = useState([]);
             const [chatInput, setChatInput] = useState('');
+            
             const [showRoleModal, setShowRoleModal] = useState(false);
             const [showResultModal, setShowResultModal] = useState(false);
-            
-            const chatEndRef = useRef(null);
 
-            // 닉네임 저장
             useEffect(() => { if (nickname) localStorage.setItem('spyfall_nickname', nickname); }, [nickname]);
-
-            // 아이콘 렌더링
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, showRoleModal, showResultModal]);
 
-            // 채팅 스크롤 자동 이동
-            useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, showRoleModal]);
-
-            // 게임 시작 시 역할 팝업 자동 오픈
             useEffect(() => {
                 if (roomData?.status === 'playing') {
                     setShowRoleModal(true);
@@ -119,35 +135,31 @@
                 }
             }, [roomData?.status]);
 
-            // 방 데이터 & 채팅 리스너
             useEffect(() => {
                 if (!roomId) return;
 
                 const roomRef = database.ref('rooms/' + roomId);
                 const chatRef = database.ref('rooms/' + roomId + '/messages');
+                const myPlayerRef = database.ref('rooms/' + roomId + '/players/' + userId);
 
-                // 1. 방 정보 구독
                 const roomListener = roomRef.on('value', (snapshot) => {
                     const data = snapshot.val();
                     if (data) {
                         setRoomData(data);
-                        // 로컬스토리지에 현재 방 저장 (새로고침 대비)
                         localStorage.setItem('spyfall_current_room', roomId);
                     } else {
+                        // 방이 사라짐
                         alert('방이 종료되었습니다.');
                         leaveRoomCleanup();
                     }
                 });
 
-                // 2. 채팅 구독
                 const chatListener = chatRef.limitToLast(50).on('value', (snapshot) => {
                     const data = snapshot.val();
                     if (data) setMessages(Object.values(data));
                     else setMessages([]);
                 });
 
-                // 3. 자동 퇴장 설정
-                const myPlayerRef = database.ref('rooms/' + roomId + '/players/' + userId);
                 myPlayerRef.onDisconnect().remove();
 
                 return () => {
@@ -156,8 +168,6 @@
                     myPlayerRef.onDisconnect().cancel();
                 };
             }, [roomId]);
-
-            // --- 액션 핸들러 ---
 
             const leaveRoomCleanup = async () => {
                 if (roomId) {
@@ -220,7 +230,7 @@
                     status: 'playing',
                     locationName: location.place,
                     players: updatedPlayers,
-                    messages: null // 새 게임 시작 시 채팅 초기화 (선택사항)
+                    messages: null 
                 });
             };
 
@@ -255,32 +265,6 @@
                 navigator.clipboard ? navigator.clipboard.writeText(roomId).then(() => alert('복사완료')) : prompt("방 코드", roomId);
             };
 
-            // --- 렌더링 컴포넌트 ---
-
-            const ChatComponent = () => (
-                <div className="flex flex-col h-48 bg-black/20 rounded-xl border border-white/10 mt-4">
-                    <div className="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
-                        {messages.length === 0 && <div className="text-white/30 text-center text-xs">채팅을 시작해보세요</div>}
-                        {messages.map((msg, i) => (
-                            <div key={i} className="text-white">
-                                <span className="font-bold text-yellow-400 mr-2">{msg.sender}:</span>
-                                <span className="text-white/90">{msg.text}</span>
-                            </div>
-                        ))}
-                        <div ref={chatEndRef} />
-                    </div>
-                    <form onSubmit={sendMessage} className="p-2 border-t border-white/10 flex gap-2">
-                        <input 
-                            value={chatInput} 
-                            onChange={e => setChatInput(e.target.value)} 
-                            className="flex-1 bg-white/10 rounded px-2 py-1 text-sm text-white focus:outline-none"
-                            placeholder="메시지 입력..." 
-                        />
-                        <button type="submit" className="bg-blue-600 px-3 py-1 rounded text-sm font-bold">전송</button>
-                    </form>
-                </div>
-            );
-
             // --- 뷰 렌더링 ---
 
             if (view === 'lobby') {
@@ -305,10 +289,25 @@
 
             if (view === 'room' || view === 'game' || view === 'result') {
                 if (!roomData) return <div className="min-h-screen spy-gradient flex items-center justify-center">로딩 중...</div>;
+                
                 const players = Object.values(roomData.players || {});
                 const isHost = roomData.hostId === userId;
-                const me = roomData.players[userId];
+                // ⚠️ [수정] 튕김 방지: 내 정보가 없으면(로딩 덜 됐으면) null 반환해서 렌더링 중단
+                const me = roomData.players ? roomData.players[userId] : null;
                 
+                // 내 정보가 사라졌을 때 (추방 등) 로비로 이동
+                if (!me && roomData.players) {
+                    // 약간의 딜레이 후 로비로 보내거나 화면 표시
+                    return (
+                        <div className="min-h-screen spy-gradient flex items-center justify-center flex-col p-4 text-center">
+                            <div className="text-xl mb-4">방에서 연결이 끊어졌습니다.</div>
+                            <button onClick={leaveRoomCleanup} className="bg-white/20 px-6 py-2 rounded-xl">홈으로</button>
+                        </div>
+                    );
+                }
+
+                if (!me) return <div className="min-h-screen spy-gradient flex items-center justify-center">접속 중...</div>;
+
                 // 정체 공개 모달
                 if (showResultModal) {
                     return (
@@ -382,8 +381,13 @@
                                 </div>
                             )}
 
-                            {/* 채팅창 */}
-                            <ChatComponent />
+                            {/* 채팅창 (분리된 컴포넌트 사용) */}
+                            <ChatArea 
+                                messages={messages} 
+                                chatInput={chatInput} 
+                                setChatInput={setChatInput} 
+                                sendMessage={sendMessage} 
+                            />
 
                             {/* 참가자 목록 */}
                             <div className="mt-4 bg-black/20 rounded-2xl p-4 border border-white/5">
