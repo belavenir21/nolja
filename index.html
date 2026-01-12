@@ -103,6 +103,7 @@
         };
 
         const getUserColor = (uid) => {
+            if (!uid) return '#9ca3af';
             const colors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
             let hash = 0;
             for (let i = 0; i < uid.length; i++) hash = uid.charCodeAt(i) + ((hash << 5) - hash);
@@ -165,7 +166,7 @@
                             }
 
                             const isMe = msg.sender === myNickname;
-                            const nameColor = getUserColor(msg.uid || 'unknown');
+                            const nameColor = getUserColor(msg.uid);
                             let bubbleClass = 'bg-white/5 text-gray-300 border-white/5';
                             if (msg.type === 'question') bubbleClass = 'bg-blue-900/50 text-blue-100 border-blue-500/30';
                             if (msg.type === 'answer') bubbleClass = 'bg-orange-900/50 text-orange-100 border-orange-500/30';
@@ -237,6 +238,30 @@
             );
         };
 
+        // 🛡️ 에러 경계 (Error Boundary) - 앱이 죽지 않게 막아줌
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false };
+            }
+            static getDerivedStateFromError(error) { return { hasError: true }; }
+            componentDidCatch(error, errorInfo) { console.error("Crash detected:", error, errorInfo); }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="spy-bg flex items-center justify-center text-center p-6">
+                            <div className="glass-card p-8 rounded-3xl">
+                                <h1 className="text-2xl font-bold mb-4 text-red-400">오류가 발생했습니다</h1>
+                                <p className="text-gray-400 mb-6 text-sm">일시적인 연결 문제일 수 있습니다.</p>
+                                <button onClick={() => window.location.reload()} className="bg-white/10 px-6 py-3 rounded-xl font-bold">새로고침</button>
+                            </div>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
         function App() {
             const [userId] = useState(() => {
                 const stored = localStorage.getItem('spyfall_user_id');
@@ -275,14 +300,22 @@
                     setShowResultModal(true);
                     setShowRoleModal(false);
                     setTurnNotification(null);
+                } else if (roomData?.status === 'waiting') {
+                    setShowResultModal(false);
+                    setShowRoleModal(false);
+                    setTurnNotification(null);
                 }
             }, [roomData?.status]);
 
             useEffect(() => {
+                // 🛡️ [수정] 게임 상태에 따라 턴 알림 표시 (안전장치 추가)
                 if (roomData?.status === 'playing' && roomData.gameState) {
                     const { turnStartTime, turnPlayer, targetPlayer } = roomData.gameState;
-                    if (turnStartTime > lastTurnTimeRef.current) {
+                    
+                    // turnStartTime이 존재하고 변경되었을 때만 실행
+                    if (turnStartTime && turnStartTime > lastTurnTimeRef.current) {
                         lastTurnTimeRef.current = turnStartTime;
+                        
                         if (turnPlayer === userId && !targetPlayer) {
                             setTurnNotification({ type: 'ask', title: '🗣️ 질문 차례!', message: '원하는 사람을 지목하고 질문하세요.', color: 'bg-blue-600 border-blue-400' });
                         } else if (targetPlayer === userId) {
@@ -304,6 +337,7 @@
                         setRoomData(data);
                         localStorage.setItem('spyfall_current_room', roomId);
                     } else {
+                        // 방이 삭제됨
                         alert('방이 종료되었습니다.');
                         leaveRoomCleanup();
                     }
@@ -369,8 +403,10 @@
             const handleJoinRoom = async () => {
                 if (!nickname.trim() || !inputRoomId.trim()) return setError('정보 입력 필수');
                 const targetId = inputRoomId.toUpperCase();
+                
                 const snap = await database.ref('rooms/' + targetId).once('value');
                 const data = snap.val();
+                
                 if (!data) return setError('없는 방입니다. 코드를 확인하세요.');
                 if (data.status === 'playing') return setError('이미 시작된 게임입니다.');
                 if (Object.keys(data.players || {}).length >= 12) return setError('방이 꽉 찼습니다.');
@@ -429,20 +465,18 @@
                 await database.ref('rooms/' + roomId).update({ status: 'waiting', locationName: null, players: resetPlayers, gameState: null });
             };
 
-            // 플레이어 지목 (질문자만 가능)
             const handleSelectPlayer = async (targetId) => {
+                // 🛡️ [수정] 방어 코드: gameState가 없으면 실행 중단
+                if (!roomData?.gameState) return;
+
                 if (targetId === userId) return; 
-                
-                // 내 턴인지 확인
                 if (roomData.gameState.turnPlayer !== userId) return;
                 
-                // 답변자가 이미 정해졌으면(답변 대기중) 지목 불가
                 if (roomData.gameState.targetPlayer) {
                     alert("💬 상대방의 답변을 기다리는 중입니다!");
                     return;
                 }
 
-                // 🚨 질문 입력했는지 확인 (v4.9 핵심 추가)
                 const hasAsked = messages.some(m => 
                     m.uid === userId && 
                     m.type === 'question' && 
@@ -457,8 +491,9 @@
                 await database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: targetId, turnStartTime: Date.now() });
             };
 
-            // 턴 넘기기 (답변자만 가능 - 수동 버튼은 이제 거의 안씀)
             const handlePassTurn = async () => {
+                // 🛡️ [수정] 방어 코드
+                if (!roomData?.gameState) return;
                 if (roomData.gameState.targetPlayer !== userId) return;
                 await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: userId, targetPlayer: null, turnStartTime: Date.now() });
             };
@@ -466,9 +501,11 @@
             const handleGameTimeExpire = () => { if (roomData.hostId === userId) handleEndGame(); };
 
             const handleTurnTimeExpire = () => {
-                if (roomData.hostId !== userId) return;
+                if (roomData.hostId !== userId || !roomData.gameState) return;
+                
                 const { turnPlayer, targetPlayer } = roomData.gameState;
                 const playerIds = Object.keys(roomData.players);
+                
                 if (!targetPlayer) {
                     const candidates = playerIds.filter(id => id !== turnPlayer);
                     if (candidates.length > 0) {
@@ -485,7 +522,8 @@
                 if (!chatInput.trim()) return;
                 
                 let msgType = 'chat';
-                if (roomData.status === 'playing') {
+                // 🛡️ [수정] 방어 코드
+                if (roomData?.status === 'playing' && roomData.gameState) {
                     if (roomData.gameState.turnPlayer === userId && !roomData.gameState.targetPlayer) msgType = 'question';
                     else if (roomData.gameState.targetPlayer === userId) msgType = 'answer';
                 }
@@ -493,7 +531,6 @@
                 await database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text: chatInput, timestamp: Date.now(), type: msgType });
                 setChatInput('');
 
-                // 답변자가 답변을 입력하면 자동으로 턴 넘김
                 if (msgType === 'answer') handlePassTurn();
             };
 
@@ -505,7 +542,7 @@
                 return (
                     <div className="spy-bg flex items-center justify-center p-4">
                         <div className="w-full max-w-sm glass-card p-6 rounded-3xl text-center shadow-2xl relative z-10">
-                            <div className="mb-6"><div className="text-5xl mb-2 drop-shadow-lg animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1><p className="text-xs text-white/30 font-mono mt-2">Ver 4.9 Rules Enforced</p></div>
+                            <div className="mb-6"><div className="text-5xl mb-2 drop-shadow-lg animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1><p className="text-xs text-white/30 font-mono mt-2">Ver 5.1 No Crash</p></div>
                             <div className="space-y-3">
                                 <div><label className="text-xs text-gray-400 font-bold block text-left ml-2 mb-1">닉네임</label><input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="이름을 입력하세요" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all placeholder-gray-600" /></div>
                                 <div className="bg-white/5 rounded-xl p-3 text-left space-y-2 border border-white/5">
@@ -524,6 +561,7 @@
                 );
             }
 
+            // 🛡️ [수정] 렌더링 중 데이터 검증 (Null Check 강화)
             if (view === 'room' || view === 'game' || view === 'result') {
                 if (!roomData) return <div className="spy-bg flex items-center justify-center text-white">로딩 중...</div>;
                 const players = Object.values(roomData.players || {});
@@ -541,13 +579,13 @@
                 let isChatDisabled = false;
                 let chatPlaceholder = "메시지 입력...";
 
-                if (isPlaying) {
+                // 🛡️ [수정] gameState가 존재할 때만 로직 실행
+                if (isPlaying && gameState) {
                     if (!gameState.targetPlayer) {
                         if (!isMyTurn) { 
                             chatPlaceholder = "질문자가 발언 중입니다"; 
                         } else {
-                            // 질문을 입력했는지 확인
-                            const myMsgs = messages.filter(m => m.uid === userId && m.timestamp > gameState.turnStartTime);
+                            const myMsgs = messages.filter(m => m.uid === userId && m.type === 'question' && m.timestamp > gameState.turnStartTime);
                             if (myMsgs.length >= 1) { 
                                 chatPlaceholder = "👉 질문 완료! 대상을 지목하세요!"; 
                             } else {
@@ -582,20 +620,16 @@
                             {/* 상단바 */}
                             <div className="glass-card p-3 rounded-2xl mb-3 flex justify-between items-center shrink-0">
                                 <div><span className="text-[10px] text-gray-400 font-bold block">ROOM CODE</span><span className="text-2xl font-black text-yellow-400 tracking-widest">{roomId}</span></div>
-                                
-                                {/* 중앙 상태 텍스트 */}
-                                <div className="hidden md:block text-sm font-bold text-white/80 animate-pulse">{statusText}</div>
-
                                 <div className="flex gap-2">
                                     <button onClick={copyCode} className="bg-white/10 px-3 py-1.5 rounded-lg text-sm font-bold text-white border border-white/10">복사</button>
                                     <button onClick={leaveRoomCleanup} className="bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-sm font-bold border border-red-500/20">나가기</button>
                                 </div>
                             </div>
                             
-                            {/* 모바일용 상태 텍스트 */}
-                            <div className="md:hidden text-center text-xs font-bold text-white/70 mb-2">{statusText}</div>
+                            {/* 모바일용 상태 텍스트 (옵션) */}
+                            {/* <div className="md:hidden text-center text-xs font-bold text-white/70 mb-2">{statusText}</div> */}
 
-                            {/* 타이머 */}
+                            {/* 타이머 - gameState 확인 후 렌더링 */}
                             {roomData.status === 'playing' && gameState && (
                                 <div className="glass-card p-3 rounded-2xl mb-3 shrink-0">
                                     <TimerBar startTime={gameState.gameStartTime} duration={gameDuration} onExpire={handleGameTimeExpire} label="전체 시간" colorClass="bg-gradient-to-r from-indigo-500 to-purple-500" />
@@ -621,6 +655,7 @@
                             <div className="glass-card rounded-2xl p-3 mb-3 shrink-0">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                     {players.map(p => {
+                                        // 🛡️ [수정] gameState가 있을 때만 턴 계산
                                         const isTurn = gameState?.turnPlayer === p.uid;
                                         const isTarget = gameState?.targetPlayer === p.uid;
                                         const canSelect = roomData.status === 'playing' && gameState?.turnPlayer === userId && !gameState?.targetPlayer && p.uid !== userId;
@@ -633,7 +668,6 @@
                                             <div 
                                                 key={p.uid} 
                                                 onClick={() => {
-                                                    // 답변 턴일 때 사람 누르면 경고
                                                     if (gameState?.targetPlayer === userId) {
                                                         alert("💬 먼저 채팅창에 답변을 입력하세요!\n(답변 입력 후 자동으로 턴이 넘어갑니다)");
                                                         return;
@@ -681,7 +715,12 @@
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        // 🛡️ 에러 경계로 앱 감싸기
+        root.render(
+            <ErrorBoundary>
+                <App />
+            </ErrorBoundary>
+        );
     </script>
 </body>
 </html>
