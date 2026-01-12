@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPYFALL - 온라인 스파이 게임</title>
+    <title>SPYFALL - 디버그 모드</title>
     
     <!-- 라이브러리 로드 -->
     <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
@@ -241,22 +241,78 @@
             );
         };
 
+        // 🐞 디버그 패널 컴포넌트
+        const DebugPanel = ({ roomId, roomData, userId }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const [isConnected, setConnected] = useState(false);
+
+            useEffect(() => {
+                const connectedRef = database.ref(".info/connected");
+                connectedRef.on("value", (snap) => setConnected(snap.val()));
+            }, []);
+
+            if (!isOpen) {
+                return (
+                    <button onClick={() => setIsOpen(true)} className="fixed bottom-4 right-4 bg-black/50 text-white p-2 rounded-full text-xs opacity-50 hover:opacity-100 z-50">
+                        🐞
+                    </button>
+                );
+            }
+
+            return (
+                <div className="fixed bottom-4 right-4 w-64 h-64 bg-black/90 text-green-400 p-4 rounded-xl text-[10px] font-mono overflow-auto z-50 border border-green-500/30">
+                    <div className="flex justify-between mb-2 pb-2 border-b border-white/20">
+                        <span className="font-bold">DEBUG INFO</span>
+                        <button onClick={() => setIsOpen(false)}>X</button>
+                    </div>
+                    <div>STATUS: {isConnected ? "🟢 ONLINE" : "🔴 OFFLINE"}</div>
+                    <div>ROOM: {roomId || "NONE"}</div>
+                    <div>MY ID: {userId?.substring(0,8)}...</div>
+                    <div className="mt-2">GAME STATE:</div>
+                    <pre className="whitespace-pre-wrap text-white/70">
+                        {roomData ? JSON.stringify(roomData.gameState || "No GameState", null, 2) : "No RoomData"}
+                    </pre>
+                </div>
+            );
+        };
+
         // 🛡️ 에러 경계 (Error Boundary) - 앱이 죽지 않게 막아줌
         class ErrorBoundary extends React.Component {
             constructor(props) {
                 super(props);
-                this.state = { hasError: false };
+                this.state = { hasError: false, error: null, errorInfo: null };
             }
-            static getDerivedStateFromError(error) { return { hasError: true }; }
-            componentDidCatch(error, errorInfo) { console.error("Crash detected:", error, errorInfo); }
+            static getDerivedStateFromError(error) { return { hasError: true, error }; }
+            componentDidCatch(error, errorInfo) { 
+                this.setState({ error, errorInfo });
+                console.error("Crash detected:", error, errorInfo); 
+            }
+            
+            handleReset = () => {
+                if(confirm("모든 데이터를 초기화하고 새로고침 하시겠습니까?")) {
+                    localStorage.clear();
+                    window.location.reload();
+                }
+            }
+
             render() {
                 if (this.state.hasError) {
                     return (
                         <div className="spy-bg flex items-center justify-center text-center p-6">
-                            <div className="glass-card p-8 rounded-3xl">
-                                <h1 className="text-2xl font-bold mb-4 text-red-400">오류가 발생했습니다</h1>
-                                <p className="text-gray-400 mb-6 text-sm">일시적인 연결 문제일 수 있습니다.</p>
-                                <button onClick={() => window.location.reload()} className="bg-white/10 px-6 py-3 rounded-xl font-bold">새로고침</button>
+                            <div className="glass-card p-8 rounded-3xl w-full max-w-md">
+                                <h1 className="text-3xl font-black mb-4 text-red-500">🚫 오류 발생!</h1>
+                                <p className="text-gray-300 mb-4 font-bold text-lg">앱이 예기치 않게 종료되었습니다.</p>
+                                
+                                <div className="bg-black/50 p-4 rounded-xl text-left text-xs font-mono text-red-300 mb-6 overflow-auto max-h-40">
+                                    {this.state.error && this.state.error.toString()}
+                                    <br/>
+                                    {this.state.errorInfo && this.state.errorInfo.componentStack}
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <button onClick={() => window.location.reload()} className="flex-1 bg-white/10 px-6 py-3 rounded-xl font-bold hover:bg-white/20">새로고침</button>
+                                    <button onClick={this.handleReset} className="flex-1 bg-red-600/80 px-6 py-3 rounded-xl font-bold hover:bg-red-600">데이터 초기화</button>
+                                </div>
                             </div>
                         </div>
                     );
@@ -359,7 +415,7 @@
                     chatRef.off('value', chatListener);
                     myPlayerRef.onDisconnect().cancel();
                 };
-            }, [roomId, view]); // view 의존성 추가
+            }, [roomId, view]); 
 
             const leaveRoomCleanup = async () => {
                 if (roomId) {
@@ -546,7 +602,7 @@
                 return (
                     <div className="spy-bg flex items-center justify-center p-4">
                         <div className="w-full max-w-sm glass-card p-6 rounded-3xl text-center shadow-2xl relative z-10">
-                            <div className="mb-6"><div className="text-5xl mb-2 drop-shadow-lg animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1><p className="text-xs text-white/30 font-mono mt-2">Ver 5.2 Safe Mode</p></div>
+                            <div className="mb-6"><div className="text-5xl mb-2 drop-shadow-lg animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1><p className="text-xs text-white/30 font-mono mt-2">Ver 5.4 Debug Edition</p></div>
                             <div className="space-y-3">
                                 <div><label className="text-xs text-gray-400 font-bold block text-left ml-2 mb-1">닉네임</label><input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="이름을 입력하세요" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all placeholder-gray-600" /></div>
                                 <div className="bg-white/5 rounded-xl p-3 text-left space-y-2 border border-white/5">
@@ -622,10 +678,11 @@
 
                 return (
                     <div className="spy-bg p-4 flex flex-col h-screen">
+                        <DebugPanel roomId={roomId} roomData={roomData} userId={userId} />
                         <div className="max-w-5xl mx-auto w-full h-full flex flex-col relative">
                             {/* 상단바 */}
                             <div className="glass-card p-3 rounded-2xl mb-3 flex justify-between items-center shrink-0">
-                                <div><span className="text-[10px] text-gray-400 font-bold block">ROOM CODE</span><span className="text-2xl font-black text-yellow-400 tracking-widest">{roomId}</span></div>
+                                <div><span className="text-[10px] text-gray-400 font-bold block">ROOM CODE</span><span className="text-xl font-black text-yellow-400 tracking-widest">{roomId}</span></div>
                                 
                                 {/* 중앙 상태 텍스트 */}
                                 <div className="hidden md:block text-sm font-bold text-white/80 animate-pulse">{statusText}</div>
