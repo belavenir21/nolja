@@ -21,7 +21,7 @@
             background-color: #0f172a; 
             color: #f8fafc; 
             -webkit-tap-highlight-color: transparent; 
-            overflow: hidden; /* 전체 스크롤 제거 */
+            overflow: hidden; 
             height: 100vh;
         }
         .spy-bg { 
@@ -45,7 +45,6 @@
         .glow-orange { box-shadow: 0 0 15px rgba(249, 115, 22, 0.5); border-color: #f97316; }
         .progress-bar { transition: width 1s linear; }
         
-        /* 채팅 스크롤 */
         .chat-scroll::-webkit-scrollbar { width: 6px; }
         .chat-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
         .chat-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -143,7 +142,7 @@
             );
         };
 
-        const ChatArea = ({ messages, chatInput, setChatInput, sendMessage, myNickname, isChatDisabled, placeholderText }) => {
+        const ChatArea = ({ messages, chatInput, setChatInput, sendMessage, myNickname, placeholderText }) => {
             const chatEndRef = useRef(null);
             useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -155,24 +154,30 @@
                     <div className="flex-1 overflow-y-auto p-4 space-y-3 chat-scroll">
                         {messages.length === 0 && <div className="text-white/30 text-center text-sm py-10">대화 내역이 없습니다.</div>}
                         {messages.map((msg, i) => {
+                            if (msg.type === 'system') {
+                                return (
+                                    <div key={i} className="flex justify-center my-2">
+                                        <span className="text-[10px] text-white/40 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                                            {msg.text}
+                                        </span>
+                                    </div>
+                                );
+                            }
+
                             const isMe = msg.sender === myNickname;
                             const nameColor = getUserColor(msg.uid || 'unknown');
-                            const isQuestion = msg.type === 'question';
+                            let bubbleClass = 'bg-white/5 text-gray-300 border-white/5';
+                            if (msg.type === 'question') bubbleClass = 'bg-blue-900/50 text-blue-100 border-blue-500/30';
+                            if (msg.type === 'answer') bubbleClass = 'bg-orange-900/50 text-orange-100 border-orange-500/30';
                             
                             return (
                                 <div key={i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="text-[11px] font-bold px-1" style={{ color: nameColor }}>{msg.sender}</span>
-                                        {isQuestion ? 
-                                            <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/30">질문</span> :
-                                            <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded border border-orange-500/30">답변</span>
-                                        }
+                                        {msg.type === 'question' && <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/30">❓질문</span>}
+                                        {msg.type === 'answer' && <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded border border-orange-500/30">💬답변</span>}
                                     </div>
-                                    <div className={`px-4 py-2.5 rounded-2xl text-sm max-w-[90%] break-words shadow-sm leading-relaxed ${
-                                        isMe 
-                                            ? (isQuestion ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-orange-600 text-white rounded-tr-none') 
-                                            : 'bg-white/10 text-gray-100 rounded-tl-none border border-white/5'
-                                    }`}>
+                                    <div className={`px-4 py-2.5 rounded-2xl text-sm max-w-[90%] break-words shadow-sm leading-relaxed border ${bubbleClass} ${isMe ? 'rounded-tr-none' : 'rounded-tl-none'}`}>
                                         {msg.text}
                                     </div>
                                 </div>
@@ -184,11 +189,10 @@
                         <input 
                             value={chatInput} 
                             onChange={e => setChatInput(e.target.value)} 
-                            className="flex-1 bg-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 bg-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 transition-all"
                             placeholder={placeholderText} 
-                            disabled={isChatDisabled}
                         />
-                        <button type="submit" className="bg-blue-600 hover:bg-blue-500 p-3 rounded-xl transition-colors shadow-lg disabled:opacity-50 disabled:bg-gray-600" disabled={!chatInput.trim() || isChatDisabled}>
+                        <button type="submit" className="bg-blue-600 hover:bg-blue-500 p-3 rounded-xl transition-colors shadow-lg" disabled={!chatInput.trim()}>
                             <i data-lucide="send" className="w-5 h-5 text-white"></i>
                         </button>
                     </form>
@@ -321,6 +325,15 @@
 
             const leaveRoomCleanup = async () => {
                 if (roomId) {
+                    try {
+                        await database.ref(`rooms/${roomId}/messages`).push({
+                            sender: 'System',
+                            text: `${nickname}님이 퇴장하셨습니다.`,
+                            timestamp: Date.now(),
+                            type: 'system'
+                        });
+                    } catch(e) {}
+
                     await database.ref('rooms/' + roomId + '/players/' + userId).remove();
                     localStorage.removeItem('spyfall_current_room');
                     setRoomId('');
@@ -340,6 +353,14 @@
                     createdAt: Date.now(),
                     settings: { gameDuration: gameTimeOpt * 60 * 1000, turnDuration: turnTimeOpt * 1000 }
                 });
+                
+                await database.ref(`rooms/${newId}/messages`).push({
+                    sender: 'System',
+                    text: `${nickname}님이 방을 만들었습니다.`,
+                    timestamp: Date.now(),
+                    type: 'system'
+                });
+
                 setRoomId(newId);
                 setInputRoomId(newId);
                 setView('room');
@@ -353,7 +374,16 @@
                 if (!data) return setError('없는 방입니다. 코드를 확인하세요.');
                 if (data.status === 'playing') return setError('이미 시작된 게임입니다.');
                 if (Object.keys(data.players || {}).length >= 12) return setError('방이 꽉 찼습니다.');
+                
                 await database.ref(`rooms/${targetId}/players/${userId}`).set({ uid: userId, name: nickname, role: null, isSpy: false });
+                
+                await database.ref(`rooms/${targetId}/messages`).push({
+                    sender: 'System',
+                    text: `${nickname}님이 입장하셨습니다.`,
+                    timestamp: Date.now(),
+                    type: 'system'
+                });
+
                 setRoomId(targetId); 
                 setView('room');
             };
@@ -366,7 +396,11 @@
                 const spyIndex = Math.floor(Math.random() * players.length);
                 const updatedPlayers = {};
                 const firstPlayerId = players[Math.floor(Math.random() * players.length)].uid;
-                players.forEach((p, idx) => { updatedPlayers[p.uid] = { ...p, role: idx === spyIndex ? 'SPY' : roles.pop() || '시민', isSpy: idx === spyIndex }; });
+
+                players.forEach((p, idx) => {
+                    updatedPlayers[p.uid] = { ...p, role: idx === spyIndex ? 'SPY' : roles.pop() || '시민', isSpy: idx === spyIndex };
+                });
+
                 await database.ref('rooms/' + roomId).update({
                     status: 'playing',
                     locationName: location.place,
@@ -374,6 +408,14 @@
                     messages: null,
                     gameState: { gameStartTime: Date.now(), turnStartTime: Date.now(), turnPlayer: firstPlayerId, targetPlayer: null }
                 });
+                
+                await database.ref(`rooms/${roomId}/messages`).push({
+                    sender: 'System',
+                    text: `게임이 시작되었습니다! (${roomData.settings?.gameDuration/60000}분)`,
+                    timestamp: Date.now(),
+                    type: 'system'
+                });
+
                 lastTurnTimeRef.current = 0; 
             };
 
@@ -387,11 +429,35 @@
                 await database.ref('rooms/' + roomId).update({ status: 'waiting', locationName: null, players: resetPlayers, gameState: null });
             };
 
+            // 플레이어 지목 (질문자만 가능)
             const handleSelectPlayer = async (targetId) => {
-                if (targetId === userId || roomData.gameState.turnPlayer !== userId || roomData.gameState.targetPlayer) return;
+                if (targetId === userId) return; 
+                
+                // 내 턴인지 확인
+                if (roomData.gameState.turnPlayer !== userId) return;
+                
+                // 답변자가 이미 정해졌으면(답변 대기중) 지목 불가
+                if (roomData.gameState.targetPlayer) {
+                    alert("💬 상대방의 답변을 기다리는 중입니다!");
+                    return;
+                }
+
+                // 🚨 질문 입력했는지 확인 (v4.9 핵심 추가)
+                const hasAsked = messages.some(m => 
+                    m.uid === userId && 
+                    m.type === 'question' && 
+                    m.timestamp > roomData.gameState.turnStartTime
+                );
+
+                if (!hasAsked) {
+                    alert("🗣️ 먼저 채팅창에 질문을 입력하세요!");
+                    return;
+                }
+
                 await database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: targetId, turnStartTime: Date.now() });
             };
 
+            // 턴 넘기기 (답변자만 가능 - 수동 버튼은 이제 거의 안씀)
             const handlePassTurn = async () => {
                 if (roomData.gameState.targetPlayer !== userId) return;
                 await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: userId, targetPlayer: null, turnStartTime: Date.now() });
@@ -417,13 +483,17 @@
             const sendMessage = async (e) => {
                 e.preventDefault();
                 if (!chatInput.trim()) return;
+                
                 let msgType = 'chat';
                 if (roomData.status === 'playing') {
                     if (roomData.gameState.turnPlayer === userId && !roomData.gameState.targetPlayer) msgType = 'question';
                     else if (roomData.gameState.targetPlayer === userId) msgType = 'answer';
                 }
+
                 await database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text: chatInput, timestamp: Date.now(), type: msgType });
                 setChatInput('');
+
+                // 답변자가 답변을 입력하면 자동으로 턴 넘김
                 if (msgType === 'answer') handlePassTurn();
             };
 
@@ -435,7 +505,7 @@
                 return (
                     <div className="spy-bg flex items-center justify-center p-4">
                         <div className="w-full max-w-sm glass-card p-6 rounded-3xl text-center shadow-2xl relative z-10">
-                            <div className="mb-6"><div className="text-5xl mb-2 drop-shadow-lg animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1><p className="text-xs text-white/30 font-mono mt-2">Ver 4.6 Full Screen</p></div>
+                            <div className="mb-6"><div className="text-5xl mb-2 drop-shadow-lg animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1><p className="text-xs text-white/30 font-mono mt-2">Ver 4.9 Rules Enforced</p></div>
                             <div className="space-y-3">
                                 <div><label className="text-xs text-gray-400 font-bold block text-left ml-2 mb-1">닉네임</label><input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="이름을 입력하세요" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all placeholder-gray-600" /></div>
                                 <div className="bg-white/5 rounded-xl p-3 text-left space-y-2 border border-white/5">
@@ -473,15 +543,23 @@
 
                 if (isPlaying) {
                     if (!gameState.targetPlayer) {
-                        if (!isMyTurn) { isChatDisabled = true; chatPlaceholder = "질문자가 발언 중입니다"; }
-                        else {
+                        if (!isMyTurn) { 
+                            chatPlaceholder = "질문자가 발언 중입니다"; 
+                        } else {
+                            // 질문을 입력했는지 확인
                             const myMsgs = messages.filter(m => m.uid === userId && m.timestamp > gameState.turnStartTime);
-                            if (myMsgs.length >= 1) { isChatDisabled = true; chatPlaceholder = "질문 완료. 대상을 지목하세요"; }
-                            else chatPlaceholder = "질문을 입력하세요";
+                            if (myMsgs.length >= 1) { 
+                                chatPlaceholder = "👉 질문 완료! 대상을 지목하세요!"; 
+                            } else {
+                                chatPlaceholder = "질문을 입력하세요";
+                            }
                         }
                     } else {
-                        if (!isMyTargetTurn) { isChatDisabled = true; chatPlaceholder = "답변자가 답변 중입니다"; }
-                        else chatPlaceholder = "답변을 입력하세요 (엔터 시 턴 넘김)";
+                        if (!isMyTargetTurn) { 
+                            chatPlaceholder = "답변자가 답변 중입니다"; 
+                        } else {
+                            chatPlaceholder = "답변을 입력하세요 (엔터 시 턴 넘김)";
+                        }
                     }
                 }
 
@@ -503,13 +581,20 @@
                         <div className="max-w-5xl mx-auto w-full h-full flex flex-col relative">
                             {/* 상단바 */}
                             <div className="glass-card p-3 rounded-2xl mb-3 flex justify-between items-center shrink-0">
-                                <div><span className="text-[10px] text-gray-400 font-bold block">ROOM CODE</span><span className="text-xl font-black text-yellow-400 tracking-widest">{roomId}</span></div>
+                                <div><span className="text-[10px] text-gray-400 font-bold block">ROOM CODE</span><span className="text-2xl font-black text-yellow-400 tracking-widest">{roomId}</span></div>
+                                
+                                {/* 중앙 상태 텍스트 */}
+                                <div className="hidden md:block text-sm font-bold text-white/80 animate-pulse">{statusText}</div>
+
                                 <div className="flex gap-2">
                                     <button onClick={copyCode} className="bg-white/10 px-3 py-1.5 rounded-lg text-sm font-bold text-white border border-white/10">복사</button>
                                     <button onClick={leaveRoomCleanup} className="bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-sm font-bold border border-red-500/20">나가기</button>
                                 </div>
                             </div>
                             
+                            {/* 모바일용 상태 텍스트 */}
+                            <div className="md:hidden text-center text-xs font-bold text-white/70 mb-2">{statusText}</div>
+
                             {/* 타이머 */}
                             {roomData.status === 'playing' && gameState && (
                                 <div className="glass-card p-3 rounded-2xl mb-3 shrink-0">
@@ -538,16 +623,29 @@
                                     {players.map(p => {
                                         const isTurn = gameState?.turnPlayer === p.uid;
                                         const isTarget = gameState?.targetPlayer === p.uid;
-                                        const canSelect = isPlaying && isMyTurn && !gameState?.targetPlayer && p.uid !== userId;
+                                        const canSelect = roomData.status === 'playing' && gameState?.turnPlayer === userId && !gameState?.targetPlayer && p.uid !== userId;
                                         let borderClass = 'border-transparent bg-black/20';
                                         if (isTurn) borderClass = 'glow-blue bg-blue-900/30 text-blue-100';
                                         if (isTarget) borderClass = 'glow-orange bg-orange-900/30 text-orange-100';
                                         if (canSelect) borderClass = 'border-white/30 bg-white/10 cursor-pointer hover:bg-white/20 hover:border-white/50 animate-pulse';
+                                        
                                         return (
-                                            <div key={p.uid} onClick={() => canSelect && handleSelectPlayer(p.uid)} className={`p-2 rounded-xl text-center text-sm font-bold border transition-all relative ${borderClass}`}>
+                                            <div 
+                                                key={p.uid} 
+                                                onClick={() => {
+                                                    // 답변 턴일 때 사람 누르면 경고
+                                                    if (gameState?.targetPlayer === userId) {
+                                                        alert("💬 먼저 채팅창에 답변을 입력하세요!\n(답변 입력 후 자동으로 턴이 넘어갑니다)");
+                                                        return;
+                                                    }
+                                                    if (canSelect) handleSelectPlayer(p.uid);
+                                                }} 
+                                                className={`p-2 rounded-xl text-center text-sm font-bold border transition-all relative ${borderClass}`}
+                                            >
                                                 {isTurn && <span className="absolute -top-1 -left-1 text-[9px] bg-blue-600 text-white px-1 rounded-full shadow-lg">질문</span>}
                                                 {isTarget && <span className="absolute -top-1 -right-1 text-[9px] bg-orange-600 text-white px-1 rounded-full shadow-lg">답변</span>}
                                                 <div className="truncate">{p.name} {p.uid === userId && '(나)'}</div>
+                                                {canSelect && <div className="text-[10px] text-yellow-300 mt-1">👆 지목하기</div>}
                                             </div>
                                         );
                                     })}
@@ -556,7 +654,7 @@
 
                             {/* 채팅 & 로그 (플렉스 확장 영역) */}
                             <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-3 mb-16 md:mb-20">
-                                <div className="flex-1 h-full"><ChatArea messages={messages} chatInput={chatInput} setChatInput={setChatInput} sendMessage={sendMessage} myNickname={nickname} isChatDisabled={isChatDisabled} placeholderText={chatPlaceholder} /></div>
+                                <div className="flex-1 h-full"><ChatArea messages={messages} chatInput={chatInput} setChatInput={setChatInput} sendMessage={sendMessage} myNickname={nickname} placeholderText={chatPlaceholder} /></div>
                                 <div className="flex-1 h-full hidden md:block"><PlayerLog players={players} messages={messages} /></div>
                             </div>
 
