@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPYFALL - 디버그 모드</title>
+    <title>SPYFALL - 연결 상태 확인</title>
     
     <!-- 라이브러리 로드 -->
     <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
@@ -66,7 +66,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // 🔥 [중요] 여기에 본인의 Firebase 설정을 붙여넣으세요 🔥
+        // 🚨 [주의] 여기에 본인의 Firebase 설정을 반드시 넣어야 합니다! 🚨
         const firebaseConfig = {
             apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM",
             authDomain: "spyfall-b107.firebaseapp.com",
@@ -78,10 +78,16 @@
             measurementId: "G-HYQR22H174"
         };
 
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
+        // Firebase 초기화 (설정값 체크 포함)
+        let isFirebaseConfigured = false;
+        if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            isFirebaseConfigured = true;
         }
-        const database = firebase.database();
+        
+        const database = isFirebaseConfigured ? firebase.database() : null;
 
         const GAME_DATA = {
             hospital: { place: "🏥 종합병원", roles: ["외과 의사", "수간호사", "응급 환자", "병원장", "구급대원", "약사", "청소부", "보호자"] },
@@ -241,41 +247,6 @@
             );
         };
 
-        // 🐞 디버그 패널 컴포넌트
-        const DebugPanel = ({ roomId, roomData, userId }) => {
-            const [isOpen, setIsOpen] = useState(false);
-            const [isConnected, setConnected] = useState(false);
-
-            useEffect(() => {
-                const connectedRef = database.ref(".info/connected");
-                connectedRef.on("value", (snap) => setConnected(snap.val()));
-            }, []);
-
-            if (!isOpen) {
-                return (
-                    <button onClick={() => setIsOpen(true)} className="fixed bottom-4 right-4 bg-black/50 text-white p-2 rounded-full text-xs opacity-50 hover:opacity-100 z-50">
-                        🐞
-                    </button>
-                );
-            }
-
-            return (
-                <div className="fixed bottom-4 right-4 w-64 h-64 bg-black/90 text-green-400 p-4 rounded-xl text-[10px] font-mono overflow-auto z-50 border border-green-500/30">
-                    <div className="flex justify-between mb-2 pb-2 border-b border-white/20">
-                        <span className="font-bold">DEBUG INFO</span>
-                        <button onClick={() => setIsOpen(false)}>X</button>
-                    </div>
-                    <div>STATUS: {isConnected ? "🟢 ONLINE" : "🔴 OFFLINE"}</div>
-                    <div>ROOM: {roomId || "NONE"}</div>
-                    <div>MY ID: {userId?.substring(0,8)}...</div>
-                    <div className="mt-2">GAME STATE:</div>
-                    <pre className="whitespace-pre-wrap text-white/70">
-                        {roomData ? JSON.stringify(roomData.gameState || "No GameState", null, 2) : "No RoomData"}
-                    </pre>
-                </div>
-            );
-        };
-
         // 🛡️ 에러 경계 (Error Boundary) - 앱이 죽지 않게 막아줌
         class ErrorBoundary extends React.Component {
             constructor(props) {
@@ -321,6 +292,29 @@
             }
         }
 
+        // 🔥 연결 상태 감지 컴포넌트
+        const ConnectionStatus = () => {
+            const [connected, setConnected] = useState(false);
+            
+            useEffect(() => {
+                if (!database) return;
+                const connectedRef = database.ref('.info/connected');
+                const listener = connectedRef.on('value', (snap) => {
+                    setConnected(snap.val() === true);
+                });
+                return () => connectedRef.off('value', listener);
+            }, []);
+
+            if (!isFirebaseConfigured) return null;
+
+            return (
+                <div className={`fixed top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold border flex items-center gap-2 z-50 transition-colors ${connected ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
+                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
+                    {connected ? '온라인' : '오프라인 (연결 끊김)'}
+                </div>
+            );
+        };
+
         function App() {
             const [userId] = useState(() => {
                 const stored = localStorage.getItem('spyfall_user_id');
@@ -347,6 +341,7 @@
             const [turnTimeOpt, setTurnTimeOpt] = useState(20);
 
             const lastTurnTimeRef = useRef(0);
+            const loadingTimeoutRef = useRef(null); // 로딩 타임아웃 참조
 
             useEffect(() => { if (nickname) localStorage.setItem('spyfall_nickname', nickname); }, [nickname]);
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, showRoleModal, showResultModal, roomData, turnNotification]);
@@ -367,13 +362,10 @@
             }, [roomData?.status]);
 
             useEffect(() => {
-                // 🛡️ [수정] 게임 상태에 따라 턴 알림 표시 (안전장치 추가)
                 if (roomData?.status === 'playing' && roomData.gameState) {
                     const { turnStartTime, turnPlayer, targetPlayer } = roomData.gameState;
-                    
-                    if (turnStartTime && turnStartTime > lastTurnTimeRef.current) {
+                    if (turnStartTime > lastTurnTimeRef.current) {
                         lastTurnTimeRef.current = turnStartTime;
-                        
                         if (turnPlayer === userId && !targetPlayer) {
                             setTurnNotification({ type: 'ask', title: '🗣️ 질문 차례!', message: '원하는 사람을 지목하고 질문하세요.', color: 'bg-blue-600 border-blue-400' });
                         } else if (targetPlayer === userId) {
@@ -384,7 +376,7 @@
             }, [roomData, userId]);
 
             useEffect(() => {
-                if (!roomId) return;
+                if (!roomId || !database) return;
                 const roomRef = database.ref('rooms/' + roomId);
                 const chatRef = database.ref('rooms/' + roomId + '/messages');
                 const myPlayerRef = database.ref('rooms/' + roomId + '/players/' + userId);
@@ -395,11 +387,8 @@
                         setRoomData(data);
                         localStorage.setItem('spyfall_current_room', roomId);
                     } else {
-                        // 방이 삭제됨 (뷰가 방이면 튕김 처리)
-                        if (view === 'room' || view === 'game') {
-                            alert('방이 종료되었습니다.');
-                            leaveRoomCleanup();
-                        }
+                        alert('방이 종료되었습니다.');
+                        leaveRoomCleanup();
                     }
                 });
 
@@ -415,10 +404,10 @@
                     chatRef.off('value', chatListener);
                     myPlayerRef.onDisconnect().cancel();
                 };
-            }, [roomId, view]); 
+            }, [roomId]);
 
             const leaveRoomCleanup = async () => {
-                if (roomId) {
+                if (roomId && database) {
                     try {
                         await database.ref(`rooms/${roomId}/messages`).push({
                             sender: 'System',
@@ -438,50 +427,63 @@
             };
 
             const handleCreateRoom = async () => {
+                if (!isFirebaseConfigured) return alert("Firebase 키 설정이 필요합니다!");
                 if (!nickname.trim()) return setError('닉네임 필수');
                 const newId = generateRoomCode();
-                await database.ref('rooms/' + newId).set({
-                    hostId: userId,
-                    players: { [userId]: { uid: userId, name: nickname, role: null, isSpy: false } },
-                    status: 'waiting',
-                    createdAt: Date.now(),
-                    settings: { gameDuration: gameTimeOpt * 60 * 1000, turnDuration: turnTimeOpt * 1000 }
-                });
                 
-                await database.ref(`rooms/${newId}/messages`).push({
-                    sender: 'System',
-                    text: `${nickname}님이 방을 만들었습니다.`,
-                    timestamp: Date.now(),
-                    type: 'system'
-                });
+                try {
+                    await database.ref('rooms/' + newId).set({
+                        hostId: userId,
+                        players: { [userId]: { uid: userId, name: nickname, role: null, isSpy: false } },
+                        status: 'waiting',
+                        createdAt: Date.now(),
+                        settings: { gameDuration: gameTimeOpt * 60 * 1000, turnDuration: turnTimeOpt * 1000 }
+                    });
+                    
+                    await database.ref(`rooms/${newId}/messages`).push({
+                        sender: 'System',
+                        text: `${nickname}님이 방을 만들었습니다.`,
+                        timestamp: Date.now(),
+                        type: 'system'
+                    });
 
-                setRoomId(newId);
-                setInputRoomId(newId);
-                setView('room');
+                    setRoomId(newId);
+                    setInputRoomId(newId);
+                    setView('room');
+                } catch (e) {
+                    alert("방 생성 실패! (Firebase 연결 확인)");
+                    console.error(e);
+                }
             };
 
             const handleJoinRoom = async () => {
+                if (!isFirebaseConfigured) return alert("Firebase 키 설정이 필요합니다!");
                 if (!nickname.trim() || !inputRoomId.trim()) return setError('정보 입력 필수');
                 const targetId = inputRoomId.toUpperCase();
                 
-                const snap = await database.ref('rooms/' + targetId).once('value');
-                const data = snap.val();
-                
-                if (!data) return setError('없는 방입니다. 코드를 확인하세요.');
-                if (data.status === 'playing') return setError('이미 시작된 게임입니다.');
-                if (Object.keys(data.players || {}).length >= 12) return setError('방이 꽉 찼습니다.');
-                
-                await database.ref(`rooms/${targetId}/players/${userId}`).set({ uid: userId, name: nickname, role: null, isSpy: false });
-                
-                await database.ref(`rooms/${targetId}/messages`).push({
-                    sender: 'System',
-                    text: `${nickname}님이 입장하셨습니다.`,
-                    timestamp: Date.now(),
-                    type: 'system'
-                });
+                try {
+                    const snap = await database.ref('rooms/' + targetId).once('value');
+                    const data = snap.val();
+                    
+                    if (!data) return setError('없는 방입니다. 코드를 확인하세요.');
+                    if (data.status === 'playing') return setError('이미 시작된 게임입니다.');
+                    if (Object.keys(data.players || {}).length >= 12) return setError('방이 꽉 찼습니다.');
+                    
+                    await database.ref(`rooms/${targetId}/players/${userId}`).set({ uid: userId, name: nickname, role: null, isSpy: false });
+                    
+                    await database.ref(`rooms/${targetId}/messages`).push({
+                        sender: 'System',
+                        text: `${nickname}님이 입장하셨습니다.`,
+                        timestamp: Date.now(),
+                        type: 'system'
+                    });
 
-                setRoomId(targetId); 
-                setView('room');
+                    setRoomId(targetId); 
+                    setView('room');
+                } catch (e) {
+                    alert("접속 실패! (Firebase 연결 확인)");
+                    console.error(e);
+                }
             };
 
             const handleStartGame = async () => {
@@ -526,33 +528,18 @@
             };
 
             const handleSelectPlayer = async (targetId) => {
-                // 🛡️ [수정] 방어 코드: gameState가 없으면 실행 중단
                 if (!roomData?.gameState) return;
-
                 if (targetId === userId) return; 
                 if (roomData.gameState.turnPlayer !== userId) return;
-                
-                if (roomData.gameState.targetPlayer) {
-                    alert("💬 상대방의 답변을 기다리는 중입니다!");
-                    return;
-                }
+                if (roomData.gameState.targetPlayer) { alert("💬 상대방의 답변을 기다리는 중입니다!"); return; }
 
-                const hasAsked = messages.some(m => 
-                    m.uid === userId && 
-                    m.type === 'question' && 
-                    m.timestamp > roomData.gameState.turnStartTime
-                );
-
-                if (!hasAsked) {
-                    alert("🗣️ 먼저 채팅창에 질문을 입력하세요!");
-                    return;
-                }
+                const hasAsked = messages.some(m => m.uid === userId && m.type === 'question' && m.timestamp > roomData.gameState.turnStartTime);
+                if (!hasAsked) { alert("🗣️ 먼저 채팅창에 질문을 입력하세요!"); return; }
 
                 await database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: targetId, turnStartTime: Date.now() });
             };
 
             const handlePassTurn = async () => {
-                // 🛡️ [수정] 방어 코드
                 if (!roomData?.gameState) return;
                 if (roomData.gameState.targetPlayer !== userId) return;
                 await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: userId, targetPlayer: null, turnStartTime: Date.now() });
@@ -582,7 +569,6 @@
                 if (!chatInput.trim()) return;
                 
                 let msgType = 'chat';
-                // 🛡️ [수정] 방어 코드
                 if (roomData?.status === 'playing' && roomData.gameState) {
                     if (roomData.gameState.turnPlayer === userId && !roomData.gameState.targetPlayer) msgType = 'question';
                     else if (roomData.gameState.targetPlayer === userId) msgType = 'answer';
@@ -598,11 +584,28 @@
 
             // --- UI ---
 
+            if (!isFirebaseConfigured) {
+                return (
+                    <div className="spy-bg flex items-center justify-center p-6 text-center">
+                        <div className="glass-card p-8 rounded-3xl max-w-md">
+                            <h1 className="text-3xl font-black text-red-500 mb-4">⚠️ 설정 필요</h1>
+                            <p className="text-gray-300 mb-6">
+                                index.html 파일을 열어서<br/>
+                                <code className="bg-black/50 px-2 py-1 rounded text-yellow-400">firebaseConfig</code> 부분에<br/>
+                                본인의 API Key를 입력해야 합니다!
+                            </p>
+                            <p className="text-sm text-gray-500">("YOUR_API_KEY"라고 적힌 부분을 찾으세요)</p>
+                        </div>
+                    </div>
+                );
+            }
+
             if (view === 'lobby') {
                 return (
                     <div className="spy-bg flex items-center justify-center p-4">
+                        <ConnectionStatus />
                         <div className="w-full max-w-sm glass-card p-6 rounded-3xl text-center shadow-2xl relative z-10">
-                            <div className="mb-6"><div className="text-5xl mb-2 drop-shadow-lg animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1><p className="text-xs text-white/30 font-mono mt-2">Ver 5.4 Debug Edition</p></div>
+                            <div className="mb-6"><div className="text-5xl mb-2 drop-shadow-lg animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1><p className="text-xs text-white/30 font-mono mt-2">Ver 5.6 Safe Connect</p></div>
                             <div className="space-y-3">
                                 <div><label className="text-xs text-gray-400 font-bold block text-left ml-2 mb-1">닉네임</label><input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="이름을 입력하세요" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all placeholder-gray-600" /></div>
                                 <div className="bg-white/5 rounded-xl p-3 text-left space-y-2 border border-white/5">
@@ -621,9 +624,15 @@
                 );
             }
 
-            // 🛡️ [수정] 렌더링 중 데이터 검증 (Null Check 강화 및 로딩 스피너)
             if (view === 'room' || view === 'game' || view === 'result') {
-                if (!roomData) return <div className="spy-bg flex items-center justify-center"><div className="spinner"></div><div className="text-white mt-4 font-bold">데이터 로딩 중...</div></div>;
+                if (!roomData) {
+                    // 5초 뒤에도 로딩 중이면 타임아웃 메시지 표시
+                    setTimeout(() => {
+                        const el = document.getElementById('loading-msg');
+                        if(el) el.innerText = "연결이 지연되고 있습니다... (새로고침 권장)";
+                    }, 5000);
+                    return <div className="spy-bg flex items-center justify-center flex-col"><div className="spinner mb-4"></div><div id="loading-msg" className="text-white font-bold animate-pulse">데이터 로딩 중...</div></div>;
+                }
                 
                 const players = Object.values(roomData.players || {});
                 const isHost = roomData.hostId === userId;
@@ -632,18 +641,19 @@
                 const gameDuration = roomData.settings?.gameDuration || 8 * 60 * 1000;
                 const turnDuration = roomData.settings?.turnDuration || 20 * 1000;
 
-                // 🛡️ 내 정보가 없으면 로비로 튕기기 전에 로딩 화면 유지
-                if (!me) return <div className="spy-bg flex items-center justify-center"><div className="spinner"></div><div className="text-white mt-4 font-bold">플레이어 정보 확인 중...</div></div>;
+                if (!me) return <div className="spy-bg flex items-center justify-center flex-col p-4 text-center text-white"><h2 className="text-xl font-bold mb-4">연결 끊김</h2><button onClick={leaveRoomCleanup} className="bg-white/20 px-6 py-3 rounded-xl">나가기</button></div>;
 
                 const isPlaying = roomData.status === 'playing';
                 const isMyTurn = gameState?.turnPlayer === userId;
                 const isMyTargetTurn = gameState?.targetPlayer === userId;
                 let isChatDisabled = false;
                 let chatPlaceholder = "메시지 입력...";
+                let statusText = "게임 대기 중...";
 
-                // 🛡️ [수정] gameState가 존재할 때만 로직 실행
                 if (isPlaying && gameState) {
                     if (!gameState.targetPlayer) {
+                        const tp = roomData.players[gameState.turnPlayer];
+                        statusText = `🗣️ ${tp?.name || '???'}님이 질문하는 중...`;
                         if (!isMyTurn) { 
                             chatPlaceholder = "질문자가 발언 중입니다"; 
                         } else {
@@ -655,6 +665,8 @@
                             }
                         }
                     } else {
+                        const tp = roomData.players[gameState.targetPlayer];
+                        statusText = `💬 ${tp?.name || '???'}님이 답변하는 중...`;
                         if (!isMyTargetTurn) { 
                             chatPlaceholder = "답변자가 답변 중입니다"; 
                         } else {
@@ -678,25 +690,19 @@
 
                 return (
                     <div className="spy-bg p-4 flex flex-col h-screen">
-                        <DebugPanel roomId={roomId} roomData={roomData} userId={userId} />
+                        <ConnectionStatus />
                         <div className="max-w-5xl mx-auto w-full h-full flex flex-col relative">
                             {/* 상단바 */}
                             <div className="glass-card p-3 rounded-2xl mb-3 flex justify-between items-center shrink-0">
                                 <div><span className="text-[10px] text-gray-400 font-bold block">ROOM CODE</span><span className="text-xl font-black text-yellow-400 tracking-widest">{roomId}</span></div>
-                                
-                                {/* 중앙 상태 텍스트 */}
                                 <div className="hidden md:block text-sm font-bold text-white/80 animate-pulse">{statusText}</div>
-
                                 <div className="flex gap-2">
                                     <button onClick={copyCode} className="bg-white/10 px-3 py-1.5 rounded-lg text-sm font-bold text-white border border-white/10">복사</button>
                                     <button onClick={leaveRoomCleanup} className="bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-sm font-bold border border-red-500/20">나가기</button>
                                 </div>
                             </div>
                             
-                            {/* 모바일용 상태 텍스트 */}
-                            {/* <div className="md:hidden text-center text-xs font-bold text-white/70 mb-2">{statusText}</div> */}
-
-                            {/* 타이머 - gameState 확인 후 렌더링 */}
+                            {/* 타이머 */}
                             {roomData.status === 'playing' && gameState && (
                                 <div className="glass-card p-3 rounded-2xl mb-3 shrink-0">
                                     <TimerBar startTime={gameState.gameStartTime} duration={gameDuration} onExpire={handleGameTimeExpire} label="전체 시간" colorClass="bg-gradient-to-r from-indigo-500 to-purple-500" />
@@ -722,7 +728,6 @@
                             <div className="glass-card rounded-2xl p-3 mb-3 shrink-0">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                     {players.map(p => {
-                                        // 🛡️ [수정] gameState가 있을 때만 턴 계산
                                         const isTurn = gameState?.turnPlayer === p.uid;
                                         const isTarget = gameState?.targetPlayer === p.uid;
                                         const canSelect = roomData.status === 'playing' && gameState?.turnPlayer === userId && !gameState?.targetPlayer && p.uid !== userId;
@@ -730,7 +735,6 @@
                                         if (isTurn) borderClass = 'glow-blue bg-blue-900/30 text-blue-100';
                                         if (isTarget) borderClass = 'glow-orange bg-orange-900/30 text-orange-100';
                                         if (canSelect) borderClass = 'border-white/30 bg-white/10 cursor-pointer hover:bg-white/20 hover:border-white/50 animate-pulse';
-                                        
                                         return (
                                             <div 
                                                 key={p.uid} 
@@ -753,7 +757,7 @@
                                 </div>
                             </div>
 
-                            {/* 채팅 & 로그 (플렉스 확장 영역) */}
+                            {/* 채팅 & 로그 */}
                             <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-3 mb-16 md:mb-20">
                                 <div className="flex-1 h-full"><ChatArea messages={messages} chatInput={chatInput} setChatInput={setChatInput} sendMessage={sendMessage} myNickname={nickname} placeholderText={chatPlaceholder} /></div>
                                 <div className="flex-1 h-full hidden md:block"><PlayerLog players={players} messages={messages} /></div>
@@ -782,7 +786,6 @@
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        // 🛡️ 에러 경계로 앱 감싸기
         root.render(
             <ErrorBoundary>
                 <App />
