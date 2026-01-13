@@ -38,10 +38,9 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useLayoutEffect } = React;
 
-        // 🚨🚨🚨 [중요] 아래 설정을 본인 Firebase 콘솔 내용으로 '전부' 교체하세요! 🚨🚨🚨
-        // API Key만 바꾸면 안됩니다! projectId, databaseURL도 본인 것이어야 합니다.
+        // ✅ 사용자 설정값 자동 적용 (수정 불필요)
         const firebaseConfig = {
-            apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM", 
+            apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM",
             authDomain: "spyfall-b107.firebaseapp.com",
             databaseURL: "https://spyfall-b107-default-rtdb.firebaseio.com",
             projectId: "spyfall-b107",
@@ -50,19 +49,17 @@
             appId: "1:35799604494:web:9558db68aa6c5347d60b5f",
             measurementId: "G-HYQR22H174"
         };
-        
 
-        // Firebase 초기화 로직 (설정값이 있으면 무조건 시도)
-        if (!firebase.apps.length && firebaseConfig.apiKey) {
-            try {
+        // Firebase 초기화
+        let database = null;
+        try {
+            if (!firebase.apps.length) {
                 firebase.initializeApp(firebaseConfig);
-            } catch (e) {
-                console.error("Firebase Init Error:", e);
-                alert("Firebase 설정 오류: 콘솔을 확인하세요.");
             }
+            database = firebase.database();
+        } catch (e) {
+            console.error("Firebase Init Error:", e);
         }
-        
-        const database = firebase.apps.length ? firebase.database() : null;
 
         const SPYFALL_DATA = {
             hospital: { place: "🏥 종합병원", roles: ["외과 의사", "간호사", "환자", "병원장", "구급대원", "약사", "청소부", "보호자"] },
@@ -108,6 +105,7 @@
             return colors[Math.abs(hash) % colors.length];
         };
 
+        // --- UI 컴포넌트 ---
         const TimerBar = ({ startTime, duration, onExpire, label, colorClass, showControl, onReduce }) => {
             const [timeLeft, setTimeLeft] = useState(duration);
             const [progress, setProgress] = useState(100);
@@ -252,7 +250,6 @@
                                 );
                             })}
                         </div>
-                        {/* 투표 닫기 버튼 삭제: 투표는 강제 진행 */}
                     </div>
                 </div>
             );
@@ -458,8 +455,8 @@
             };
 
             const handleCreateRoom = async () => {
+                if (!database) return alert("Firebase 연결 오류");
                 if (!nickname.trim()) return alert('닉네임 필수');
-                if (!database) return alert("Firebase 연결 실패");
                 const newId = generateRoomCode();
                 try {
                     await database.ref('rooms/' + newId).set({
@@ -471,6 +468,7 @@
                     });
                     setRoomId(newId); setInputRoomId(newId); setView('room');
                 } catch (e) {
+                    console.error(e);
                     alert("방 생성 오류: " + e.message);
                 }
             };
@@ -556,6 +554,12 @@
                 try { await database.ref(`rooms/${roomId}/votes/${userId}`).set(targetUid); } catch(e) { console.error(e); }
             };
 
+            const handleReduceGameTime = async () => {
+                const currentStart = roomData.gameState.gameStartTime;
+                await database.ref(`rooms/${roomId}/gameState`).update({ gameStartTime: currentStart - 60000 });
+                sendMessageLocal("⏰ 시간 -1분", "system");
+            };
+
             const handleTimeReductionToggle = async () => {
                 const timeVotes = roomData.gameState.timeVotes || {};
                 if (timeVotes[userId]) {
@@ -630,7 +634,20 @@
                 else { prompt("방 코드", roomId); }
             };
 
-            if (!isFirebaseConfigured) return <div className="spy-bg flex items-center justify-center p-6 text-white font-bold">API KEY 설정 필요</div>;
+            if (!database) {
+                return (
+                    <div className="spy-bg flex items-center justify-center p-6 text-center text-white">
+                        <div className="glass-card p-8 rounded-3xl">
+                            <h1 className="text-2xl font-bold mb-4 text-red-500">설정 오류</h1>
+                            <p className="mb-4">Firebase API 키가 설정되지 않았습니다.</p>
+                            <p className="text-sm text-gray-400 mb-6">index.html 파일을 열어<br/>firebaseConfig 부분을 수정해주세요.</p>
+                            <div className="bg-black/50 p-4 rounded text-xs text-left font-mono text-gray-300">
+                                apiKey: "..."<br/>projectId: "..."<br/>databaseURL: "..."
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
 
             if (view === 'lobby') {
                 return (
