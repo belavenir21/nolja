@@ -47,6 +47,10 @@
         .modal-enter { animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
         @keyframes modalPop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         
+        /* 토스트 메시지 애니메이션 */
+        .toast-enter { animation: toastSlide 0.3s ease-out forwards; }
+        @keyframes toastSlide { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
         .glow-blue { box-shadow: 0 0 15px rgba(59, 130, 246, 0.6); border-color: #60a5fa; }
         .glow-orange { box-shadow: 0 0 15px rgba(249, 115, 22, 0.6); border-color: #fb923c; }
         .progress-bar { transition: width 1s linear; }
@@ -55,7 +59,6 @@
         .chat-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
         .chat-scroll::-webkit-scrollbar-track { background: transparent; }
         
-        /* 로케이션 사이드바 스크롤 */
         .loc-scroll::-webkit-scrollbar { width: 0px; }
         
         .spinner { border: 4px solid rgba(255, 255, 255, 0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #3b82f6; animation: spin 1s linear infinite; }
@@ -208,7 +211,7 @@
         // 족보 모달 (모바일용)
         const LocationModal = ({ onClose }) => (
             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 modal-enter" onClick={onClose}>
-                <div className="glass-card w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl p-5" onClick={e => e.stopPropagation()}>
+                <div className="glass-card w-full max-w-3xl max-h-[85vh] overflow-y-auto rounded-2xl p-5" onClick={e => e.stopPropagation()}>
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-black text-yellow-400">🗺️ 장소 족보</h2>
                         <button onClick={onClose} className="bg-white/10 p-2 rounded-full"><i data-lucide="x" className="w-5 h-5"></i></button>
@@ -225,7 +228,7 @@
             </div>
         );
 
-        // 사이드 족보 패널 (PC용) - 왼쪽/오른쪽 분할
+        // 사이드 족보 패널 (PC용)
         const SideLocationPanel = ({ isLeft }) => {
             const locations = Object.values(GAME_DATA);
             const displayLocs = isLeft ? locations.slice(0, 6) : locations.slice(6, 12);
@@ -257,6 +260,7 @@
             </div>
         );
 
+        // 🔥 [수정] 투표 모달 오류 수정
         const VoteModal = ({ players, votes, myVote, onVote, onClose }) => {
             const voteCounts = {};
             Object.values(votes || {}).forEach(targetId => { voteCounts[targetId] = (voteCounts[targetId] || 0) + 1; });
@@ -269,7 +273,9 @@
                                 const count = voteCounts[p.uid] || 0;
                                 const isSelected = myVote === p.uid;
                                 return (
-                                    <button key={p.uid} onClick={() => onVote(p.uid)} disabled={myVote === p.uid} className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${isSelected ? 'bg-red-600 border-red-400' : 'bg-black/40 border-white/5'}`}>
+                                    <button key={p.uid} onClick={() => onVote(p.uid)} 
+                                        // disabled={myVote === p.uid} // 👈 이 부분을 제거하여 변경 가능하게 함
+                                        className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${isSelected ? 'bg-red-600 border-red-400' : 'bg-black/40 border-white/5'}`}>
                                         <span className="font-bold text-sm">{p.name}</span>
                                         <div className="flex items-center gap-2">
                                             {count > 0 && <span className="text-xs bg-white/20 px-2 py-0.5 rounded">{count}표</span>}
@@ -284,6 +290,13 @@
                 </div>
             );
         };
+
+        // 토스트 메시지 컴포넌트
+        const Toast = ({ message }) => (
+            <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-white/90 text-black px-6 py-3 rounded-full font-bold shadow-2xl z-[100] toast-enter flex items-center gap-2">
+                <i data-lucide="check" className="w-5 h-5 text-green-600"></i> {message}
+            </div>
+        );
 
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false }; }
@@ -320,10 +333,11 @@
             const [turnNotification, setTurnNotification] = useState(null);
             const [gameTimeOpt, setGameTimeOpt] = useState(8);
             const [turnTimeOpt, setTurnTimeOpt] = useState(40);
+            const [showToast, setShowToast] = useState(false); // 토스트 상태
             const lastTurnTimeRef = useRef(0);
 
             useEffect(() => { if (nickname) localStorage.setItem('spyfall_nickname', nickname); }, [nickname]);
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, showRoleModal, showResultModal, roomData]);
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, showRoleModal, showResultModal, roomData, showToast]);
 
             useEffect(() => {
                 if (roomData?.settings) {
@@ -379,8 +393,6 @@
                     if (data) {
                         setRoomData(data);
                     } else {
-                        // 방이 없어졌을 때 처리
-                        // leaveRoomCleanup를 직접 부르면 state update loop에 빠질 수 있으므로 알림만
                         if(view !== 'lobby') {
                             alert('방이 종료되었습니다.');
                             window.location.reload(); 
@@ -401,17 +413,13 @@
                 };
             }, [roomId]);
 
-            // ⚠️ [수정] 나가기 로직 안전장치
             const leaveRoomCleanup = async () => {
                 if (roomId && database) {
-                    // 리스너 해제 먼저 고려하지 않고 일단 로컬 상태 날림 (오류 방지)
                     setRoomId('');
                     setRoomData(null); 
                     setMessages([]);
                     setView('lobby');
-                    
                     try { 
-                        // 그 다음 서버 요청 (비동기라 로컬은 이미 로비로 감)
                         await database.ref(`rooms/${roomId}/messages`).push({ sender: 'System', text: `${nickname} 퇴장`, timestamp: Date.now(), type: 'system' }); 
                         await database.ref('rooms/' + roomId + '/players/' + userId).remove();
                     } catch(e) {}
@@ -480,7 +488,15 @@
                 if (!hasAsked) { alert("🗣️ 먼저 질문을 입력하세요!"); return; }
                 await database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: targetId, turnStartTime: Date.now() });
             };
-            const handleVote = async (targetUid) => { await database.ref(`rooms/${roomId}/votes/${userId}`).set(targetUid); };
+            
+            // 🔥 [수정] 투표 핸들러 안정화
+            const handleVote = async (targetUid) => {
+                if(!database) return;
+                try {
+                    await database.ref(`rooms/${roomId}/votes/${userId}`).set(targetUid);
+                } catch(e) { console.error(e); }
+            };
+
             const handleReduceGameTime = async () => {
                 const currentStart = roomData.gameState.gameStartTime;
                 await database.ref(`rooms/${roomId}/gameState`).update({ gameStartTime: currentStart - 60000 });
@@ -508,6 +524,17 @@
                 await database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text: chatInput, timestamp: Date.now(), type: msgType });
                 setChatInput('');
                 if (msgType === 'answer') { await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: userId, targetPlayer: null, turnStartTime: Date.now() }); }
+            };
+
+            // 🔥 [추가] 방 코드 복사 핸들러
+            const copyCode = async () => {
+                if (navigator.clipboard) {
+                    await navigator.clipboard.writeText(roomId);
+                    setShowToast(true);
+                    setTimeout(() => setShowToast(false), 2000);
+                } else {
+                    prompt("방 코드", roomId);
+                }
             };
 
             // UI 렌더링
@@ -561,7 +588,6 @@
                     }
                 }
 
-                // 🌟 [수정] PC/모바일 레이아웃 분리 적용
                 return (
                     <div className="spy-bg flex flex-row">
                         {/* PC용 좌측 장소 리스트 */}
@@ -575,6 +601,7 @@
                                 <div className="text-sm font-bold text-white/90">{statusText}</div>
                                 <div className="flex gap-1">
                                     <button onClick={() => setShowLocationModal(true)} className="md:hidden bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-1 rounded text-xs font-bold">족보</button>
+                                    <button onClick={copyCode} className="bg-white/10 px-3 py-1 rounded text-xs font-bold text-white border border-white/20 hover:bg-white/20 transition-colors">복사</button>
                                     <button onClick={leaveRoomCleanup} className="bg-red-500/20 text-red-400 border border-red-500/20 px-2 py-1 rounded text-xs font-bold">나가기</button>
                                 </div>
                             </div>
@@ -589,7 +616,7 @@
                                         </select></div>
                                         <div className="flex flex-col"><span className="text-[10px] text-gray-400 font-bold mb-1">턴 시간</span>
                                         <select disabled={!isHost} value={turnTimeOpt} onChange={e => handleUpdateSettings('turn', e.target.value)} className="bg-black/30 border border-white/10 rounded px-2 py-1 text-white text-xs w-20">
-                                            {[20,30,40,50,60].map(t => <option key={t} value={t}>{t}초</option>)}
+                                            {[15,20,30,40,50,60].map(t => <option key={t} value={t}>{t}초</option>)}
                                         </select></div>
                                     </div>
                                     <div className="text-xs text-gray-400 font-bold mb-2">참여자 ({players.length})</div>
@@ -645,6 +672,9 @@
                                     <button onClick={() => setShowVoteModal(true)} className="flex-1 bg-red-600/20 text-red-400 py-3 rounded-xl text-sm font-bold border border-red-500/30">투표하기</button>
                                 </div>
                             )}
+
+                            {/* 🔥 [추가] 토스트 메시지 */}
+                            {showToast && <Toast message="방 코드가 복사되었습니다!" />}
 
                             {showRoleModal && me && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6 modal-enter" onClick={() => setShowRoleModal(false)}>
