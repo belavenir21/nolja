@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>SPYFALL - REMASTERED</title>
     
-    <!-- 라이브러리 로드 -->
     <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
@@ -63,9 +62,8 @@
         const { useState, useEffect, useRef } = React;
 
         // 🚨 [주의] 본인의 Firebase 설정값을 넣어주세요 🚨
-
         const firebaseConfig = {
-            apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM", // 본인 키 입력
+            apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM", // 👈 여기에 본인 키가 잘 들어가 있는지 확인하세요
             authDomain: "spyfall-b107.firebaseapp.com",
             databaseURL: "https://spyfall-b107-default-rtdb.firebaseio.com",
             projectId: "spyfall-b107",
@@ -75,8 +73,9 @@
             measurementId: "G-HYQR22H174"
         };
 
+        // 🔥 [수정됨] 키가 존재하기만 하면 무조건 통과하도록 로직 변경
         let isFirebaseConfigured = false;
-        if (firebaseConfig.apiKey !== "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM") {
+        if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
             if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
             isFirebaseConfigured = true;
         }
@@ -153,7 +152,7 @@
             );
         };
 
-        // 💬 [수정] 채팅창: 높이 고정 및 스크롤 개선, 말풍선 그룹화
+        // 채팅창: 키보드 가림 방지를 위해 flex-grow 사용
         const ChatArea = ({ messages, chatInput, setChatInput, sendMessage, myNickname, placeholderText }) => {
             const chatEndRef = useRef(null);
             
@@ -166,7 +165,6 @@
                         <i data-lucide="message-square" className="w-3 h-3"></i> LIVE CHAT
                     </div>
                     
-                    {/* flex-1과 overflow-y-auto를 조합하여 스크롤 영역 확보 */}
                     <div className="flex-1 overflow-y-auto p-3 space-y-1 chat-scroll">
                         {messages.length === 0 && <div className="text-white/20 text-center text-xs py-8">대화 시작...</div>}
                         
@@ -177,7 +175,6 @@
                             
                             const isMe = msg.sender === myNickname;
                             const prevMsg = messages[i - 1];
-                            // 이전 메시지와 보낸 사람, 타입이 같으면 닉네임 숨김 (연속 말풍선)
                             const isSameSender = prevMsg && prevMsg.sender === msg.sender && prevMsg.type === msg.type && prevMsg.type !== 'system';
 
                             return (
@@ -579,7 +576,7 @@
                                     </div>
                                     <div className="flex justify-between items-center"><span className="text-xs text-gray-400 font-bold">⏳ 턴 시간</span>
                                         <select value={turnTimeOpt} onChange={e => setTurnTimeOpt(Number(e.target.value))} className="bg-black/40 text-white text-xs rounded px-2 py-1 outline-none border border-white/10 w-20">
-                                            {[20,30,40,50,60,90].map(t => <option key={t} value={t}>{t}초</option>)}
+                                            {[20,30,40,50,60].map(t => <option key={t} value={t}>{t}초</option>)}
                                         </select>
                                     </div>
                                 </div>
@@ -705,8 +702,8 @@
 
                             {/* 채팅 영역 (flex-1로 남은 공간 채움) */}
                             <div className="flex-1 min-h-0 mb-2">
-                                <ChatArea messages={messages} chatInput={chatInput} setChatInput={setChatInput} sendMessage={sendMessage} myNickname={nickname} 
-                                    placeholderText={placeholderText} 
+                                <ChatArea messages={messages} chatInput={chatInput} setChatInput={setChatInput} sendMessage={sendMessage} myNickname={nickname} 
+                                    placeholderText={placeholderText} 
                                 />
                             </div>
 
