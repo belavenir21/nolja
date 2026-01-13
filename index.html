@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
-    <title>PARTY GAMES - FINAL</title>
+    <title>PARTY GAMES - FINAL FIX</title>
     
     <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -38,7 +38,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useLayoutEffect } = React;
 
-        // ✅ 사용자 설정값 자동 적용 (수정 불필요)
+        // ✅ 사용자 파이어베이스 설정
         const firebaseConfig = {
             apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM",
             authDomain: "spyfall-b107.firebaseapp.com",
@@ -50,7 +50,7 @@
             measurementId: "G-HYQR22H174"
         };
 
-        // Firebase 초기화
+        // Firebase 초기화 (변수 체크 로직 제거, DB 객체 생성만 수행)
         let database = null;
         try {
             if (!firebase.apps.length) {
@@ -634,6 +634,7 @@
                 else { prompt("방 코드", roomId); }
             };
 
+            // 🔥 [중요] DB가 null이면 에러 화면 표시
             if (!database) {
                 return (
                     <div className="spy-bg flex items-center justify-center p-6 text-center text-white">
@@ -641,9 +642,6 @@
                             <h1 className="text-2xl font-bold mb-4 text-red-500">설정 오류</h1>
                             <p className="mb-4">Firebase API 키가 설정되지 않았습니다.</p>
                             <p className="text-sm text-gray-400 mb-6">index.html 파일을 열어<br/>firebaseConfig 부분을 수정해주세요.</p>
-                            <div className="bg-black/50 p-4 rounded text-xs text-left font-mono text-gray-300">
-                                apiKey: "..."<br/>projectId: "..."<br/>databaseURL: "..."
-                            </div>
                         </div>
                     </div>
                 );
