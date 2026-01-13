@@ -2,8 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SPYFALL - 통합 버전</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+    <title>SPYFALL - REMASTERED</title>
     
     <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -21,7 +21,7 @@
             color: #f8fafc; 
             -webkit-tap-highlight-color: transparent; 
             overflow: hidden; 
-            height: 100vh;
+            height: 100dvh; /* 모바일 대응 높이 */
         }
         .spy-bg { 
             background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0f172a 60%, #020617 100%);
@@ -31,30 +31,22 @@
             flex-direction: column;
         }
         .glass-card {
-            background: rgba(30, 41, 59, 0.6);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
         .modal-enter { animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
-        @keyframes modalPop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        @keyframes modalPop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         
-        .glow-blue { box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); border-color: #3b82f6; }
-        .glow-orange { box-shadow: 0 0 15px rgba(249, 115, 22, 0.5); border-color: #f97316; }
+        .glow-blue { box-shadow: 0 0 15px rgba(59, 130, 246, 0.6); border-color: #60a5fa; }
+        .glow-orange { box-shadow: 0 0 15px rgba(249, 115, 22, 0.6); border-color: #fb923c; }
         .progress-bar { transition: width 1s linear; }
         
-        .chat-scroll::-webkit-scrollbar { width: 6px; }
+        .chat-scroll::-webkit-scrollbar { width: 4px; }
         .chat-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
-        .chat-scroll::-webkit-scrollbar-track { background: transparent; }
         
-        select {
-            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-            background-repeat: no-repeat;
-            background-position: right 0.5rem center;
-            background-size: 1em;
-            appearance: none;
-        }
         /* 로딩 스피너 */
         .spinner { border: 4px solid rgba(255, 255, 255, 0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #3b82f6; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -68,9 +60,9 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // 🚨 사용자 Firebase 설정 유지 🚨
+        // 🚨 [주의] 본인의 Firebase 설정값을 넣어주세요 🚨
         const firebaseConfig = {
-            apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM",
+            apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM", // 본인 키 입력
             authDomain: "spyfall-b107.firebaseapp.com",
             databaseURL: "https://spyfall-b107-default-rtdb.firebaseio.com",
             projectId: "spyfall-b107",
@@ -82,14 +74,13 @@
 
         let isFirebaseConfigured = false;
         if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
-            if (!firebase.apps.length) {
-                firebase.initializeApp(firebaseConfig);
-            }
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
             isFirebaseConfigured = true;
         }
         
         const database = isFirebaseConfigured ? firebase.database() : null;
 
+        // 장소 데이터
         const GAME_DATA = {
             hospital: { place: "🏥 종합병원", roles: ["외과 의사", "수간호사", "응급 환자", "병원장", "구급대원", "약사", "청소부", "보호자"] },
             school: { place: "🏫 고등학교", roles: ["담임 선생님", "전교 회장", "체육 선생님", "교장 선생님", "매점 이모", "잠자는 학생", "전학생", "양호 선생님"] },
@@ -111,7 +102,6 @@
             const keys = Object.keys(GAME_DATA);
             return GAME_DATA[keys[Math.floor(Math.random() * keys.length)]];
         };
-
         const getUserColor = (uid) => {
             if (!uid) return '#9ca3af';
             const colors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
@@ -120,86 +110,7 @@
             return colors[Math.abs(hash) % colors.length];
         };
 
-        const PlayerLog = ({ players, messages }) => {
-            return (
-                <div className="flex flex-col h-full bg-black/40 rounded-2xl border border-white/10 overflow-hidden shadow-inner">
-                    <div className="bg-white/5 p-3 px-4 border-b border-white/10 text-xs font-bold text-gray-400 uppercase flex items-center gap-2 shrink-0">
-                        <i data-lucide="list" className="w-4 h-4"></i> 답변 기록
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-3 chat-scroll space-y-3">
-                        {players.map(p => {
-                            const pMsgs = messages.filter(m => m.uid === p.uid && m.type === 'answer');
-                            return (
-                                <div key={p.uid} className="bg-white/5 rounded-xl p-3 border border-white/5">
-                                    <div className="text-xs font-bold mb-2 flex items-center gap-2" style={{color: getUserColor(p.uid)}}>
-                                        {p.name} <span className="text-gray-500 text-[10px]">({pMsgs.length})</span>
-                                    </div>
-                                    {pMsgs.length === 0 ? (
-                                        <div className="text-white/20 text-[10px] pl-1">- 답변 없음 -</div>
-                                    ) : (
-                                        <ul className="space-y-1.5">
-                                            {pMsgs.map((m, i) => (
-                                                <li key={i} className="text-xs text-gray-300 bg-black/20 p-2 rounded-lg leading-relaxed border-l-2 border-orange-500 pl-3">
-                                                    {m.text}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
-                            )
-                        })}
-                    </div>
-                </div>
-            );
-        };
-
-        const ChatArea = ({ messages, chatInput, setChatInput, sendMessage, myNickname, placeholderText }) => {
-            const chatEndRef = useRef(null);
-            useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-
-            return (
-                <div className="flex flex-col h-full bg-black/40 rounded-2xl border border-white/10 overflow-hidden shadow-inner relative">
-                    <div className="bg-white/5 p-3 px-4 border-b border-white/10 text-xs font-bold text-gray-400 uppercase flex items-center gap-2 shrink-0">
-                        <i data-lucide="message-square" className="w-4 h-4"></i> 실시간 대화
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3 chat-scroll pb-16">
-                        {messages.length === 0 && <div className="text-white/30 text-center text-sm py-10">대화 내역이 없습니다.</div>}
-                        {messages.map((msg, i) => {
-                            if (msg.type === 'system') return <div key={i} className="flex justify-center my-2"><span className="text-[10px] text-white/40 bg-white/5 px-3 py-1 rounded-full border border-white/5">{msg.text}</span></div>;
-
-                            const isMe = msg.sender === myNickname;
-                            const nameColor = getUserColor(msg.uid);
-                            let bubbleClass = 'bg-white/5 text-gray-300 border-white/5';
-                            if (msg.type === 'question') bubbleClass = 'bg-blue-900/50 text-blue-100 border-blue-500/30';
-                            if (msg.type === 'answer') bubbleClass = 'bg-orange-900/50 text-orange-100 border-orange-500/30';
-                            
-                            return (
-                                <div key={i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[11px] font-bold px-1" style={{ color: nameColor }}>{msg.sender}</span>
-                                        {msg.type === 'question' && <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/30">❓질문</span>}
-                                        {msg.type === 'answer' && <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded border border-orange-500/30">💬답변</span>}
-                                    </div>
-                                    <div className={`px-4 py-2.5 rounded-2xl text-sm max-w-[90%] break-words shadow-sm leading-relaxed border ${bubbleClass} ${isMe ? 'rounded-tr-none' : 'rounded-tl-none'}`}>
-                                        {msg.text}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        <div ref={chatEndRef} />
-                    </div>
-                    <form onSubmit={sendMessage} className="absolute bottom-0 left-0 right-0 p-2 bg-black/60 backdrop-blur-sm border-t border-white/10 flex gap-2">
-                        <input value={chatInput} onChange={e => setChatInput(e.target.value)} 
-                            className="flex-1 bg-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 transition-all placeholder-gray-500"
-                            placeholder={placeholderText} 
-                        />
-                        <button type="submit" className="bg-blue-600 hover:bg-blue-500 p-3 rounded-xl transition-colors shadow-lg" disabled={!chatInput.trim()}>
-                            <i data-lucide="send" className="w-5 h-5 text-white"></i>
-                        </button>
-                    </form>
-                </div>
-            );
-        };
+        // --- 컴포넌트 ---
 
         const TimerBar = ({ startTime, duration, onExpire, label, colorClass, showControl, onReduce }) => {
             const [timeLeft, setTimeLeft] = useState(duration);
@@ -211,7 +122,6 @@
                     const remaining = Math.max(0, duration - elapsed);
                     setTimeLeft(remaining);
                     setProgress((remaining / duration) * 100);
-
                     if (remaining <= 0) {
                         clearInterval(interval);
                         if (onExpire) onExpire();
@@ -228,10 +138,9 @@
                     <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-wider">
                         <span className="flex items-center gap-2">
                             {label}
-                            {/* [기능] 시간 조절 기능 추가 */}
                             {showControl && <button onClick={onReduce} className="bg-red-500/20 hover:bg-red-500/40 text-red-400 px-1.5 py-0.5 rounded border border-red-500/30 transition-colors">-1분</button>}
                         </span>
-                        <span className={timeLeft < 5000 ? "text-red-500 animate-ping font-black" : "text-white"}>
+                        <span className={timeLeft < 10000 ? "text-red-500 animate-pulse font-black" : "text-white"}>
                             {minutes}:{seconds.toString().padStart(2, '0')}
                         </span>
                     </div>
@@ -242,21 +151,62 @@
             );
         };
 
-        // --- 새로운 컴포넌트 추가 ---
+        // 채팅창: 키보드 가림 방지를 위해 flex-grow 사용
+        const ChatArea = ({ messages, chatInput, setChatInput, sendMessage, myNickname, placeholderText }) => {
+            const chatEndRef = useRef(null);
+            useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-        // [기능] 장소 족보 모달
+            return (
+                <div className="flex flex-col h-full bg-black/30 rounded-2xl border border-white/10 overflow-hidden shadow-inner relative">
+                    <div className="bg-white/5 p-2 px-3 border-b border-white/10 text-[10px] font-bold text-gray-400 uppercase flex items-center gap-2 shrink-0">
+                        <i data-lucide="message-square" className="w-3 h-3"></i> LIVE CHAT
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-3 space-y-2 chat-scroll">
+                        {messages.length === 0 && <div className="text-white/20 text-center text-xs py-8">대화 시작...</div>}
+                        {messages.map((msg, i) => {
+                            if (msg.type === 'system') return <div key={i} className="flex justify-center my-1"><span className="text-[10px] text-white/40 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">{msg.text}</span></div>;
+                            const isMe = msg.sender === myNickname;
+                            return (
+                                <div key={i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                                    <div className="flex items-center gap-1 mb-0.5">
+                                        <span className="text-[10px] font-bold px-1" style={{ color: getUserColor(msg.uid) }}>{msg.sender}</span>
+                                        {msg.type === 'question' && <span className="text-[8px] bg-blue-500/20 text-blue-300 px-1 rounded border border-blue-500/30">질문</span>}
+                                        {msg.type === 'answer' && <span className="text-[8px] bg-orange-500/20 text-orange-300 px-1 rounded border border-orange-500/30">답변</span>}
+                                    </div>
+                                    <div className={`px-3 py-2 rounded-xl text-sm max-w-[90%] break-words shadow-sm leading-relaxed border ${isMe ? 'bg-white/10 text-white rounded-tr-none border-white/10' : 'bg-black/40 text-gray-300 rounded-tl-none border-white/5'} ${msg.type === 'question' ? '!border-blue-500/50 !bg-blue-900/30' : ''} ${msg.type === 'answer' ? '!border-orange-500/50 !bg-orange-900/30' : ''}`}>
+                                        {msg.text}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        <div ref={chatEndRef} />
+                    </div>
+                    <form onSubmit={sendMessage} className="p-2 bg-black/40 border-t border-white/10 flex gap-2 shrink-0">
+                        <input value={chatInput} onChange={e => setChatInput(e.target.value)} 
+                            className="flex-1 bg-white/5 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all placeholder-gray-600"
+                            placeholder={placeholderText} 
+                        />
+                        <button type="submit" className="bg-blue-600 hover:bg-blue-500 p-2 rounded-xl transition-colors shadow-lg" disabled={!chatInput.trim()}>
+                            <i data-lucide="send" className="w-4 h-4 text-white"></i>
+                        </button>
+                    </form>
+                </div>
+            );
+        };
+
+        // 족보 모달
         const LocationModal = ({ onClose }) => (
             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 modal-enter" onClick={onClose}>
-                <div className="glass-card w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl p-6" onClick={e => e.stopPropagation()}>
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-black text-yellow-400">🗺️ 장소 족보</h2>
+                <div className="glass-card w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl p-5" onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-black text-yellow-400">🗺️ 장소 족보</h2>
                         <button onClick={onClose} className="bg-white/10 p-2 rounded-full"><i data-lucide="x" className="w-5 h-5"></i></button>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                         {Object.values(GAME_DATA).map((loc, i) => (
-                            <div key={i} className="bg-white/5 p-4 rounded-xl border border-white/5 hover:bg-white/10 transition-colors">
-                                <div className="font-bold text-lg mb-1">{loc.place}</div>
-                                <div className="text-xs text-gray-400 truncate">{loc.roles.slice(0, 3).join(', ')}...</div>
+                            <div key={i} className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                <div className="font-bold text-sm mb-1 text-gray-200">{loc.place}</div>
+                                <div className="text-[10px] text-gray-500 truncate">{loc.roles.slice(0, 3).join(', ')}...</div>
                             </div>
                         ))}
                     </div>
@@ -264,118 +214,70 @@
             </div>
         );
 
-        // [기능] 지목 강제 팝업
+        // 지목 팝업
         const PlayerSelectionModal = ({ players, onSelect }) => (
             <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-black/95 p-6 modal-enter">
-                <h2 className="text-3xl font-black text-blue-400 mb-2 text-center animate-bounce">👉 누구에게 질문할까요?</h2>
-                <p className="text-gray-400 mb-8 text-center">반드시 한 명을 선택해야 합니다.</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-3xl">
+                <h2 className="text-2xl font-black text-blue-400 mb-2 text-center animate-bounce">👉 질문 대상 선택</h2>
+                <div className="grid grid-cols-2 gap-3 w-full max-w-md">
                     {players.map(p => (
                         <button key={p.uid} onClick={() => onSelect(p.uid)} 
-                            className="bg-gray-800 border-2 border-gray-600 hover:border-blue-500 hover:bg-gray-700 p-6 rounded-2xl flex flex-col items-center gap-3 transition-all transform hover:scale-105 card-pop group">
-                            <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold bg-gray-900 group-hover:bg-blue-600 transition-colors" style={{color: getUserColor(p.uid)}}>
+                            className="bg-gray-800 border border-gray-600 hover:border-blue-500 hover:bg-gray-700 p-4 rounded-2xl flex flex-col items-center gap-2 transition-all card-pop">
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold bg-gray-900" style={{color: getUserColor(p.uid)}}>
                                 {p.name.substring(0,1)}
                             </div>
-                            <span className="text-xl font-bold text-white">{p.name}</span>
+                            <span className="font-bold text-white text-sm">{p.name}</span>
                         </button>
                     ))}
                 </div>
             </div>
         );
 
-        // [기능] 투표 모달
+        // 투표 모달
         const VoteModal = ({ players, votes, myVote, onVote, onClose }) => {
             const voteCounts = {};
-            Object.values(votes || {}).forEach(targetId => {
-                voteCounts[targetId] = (voteCounts[targetId] || 0) + 1;
-            });
-
+            Object.values(votes || {}).forEach(targetId => { voteCounts[targetId] = (voteCounts[targetId] || 0) + 1; });
             return (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center bg-red-900/90 p-4 modal-enter">
                     <div className="glass-card w-full max-w-md rounded-2xl p-6 border-red-500/30">
-                        <h2 className="text-2xl font-black text-red-400 mb-2 text-center">🚨 스파이 지목 투표</h2>
-                        <p className="text-center text-xs text-red-200 mb-6">과반수 이상 득표자가 나오면 게임이 종료됩니다.</p>
-                        
-                        <div className="space-y-2 mb-6">
+                        <h2 className="text-xl font-black text-red-400 mb-1 text-center">🚨 스파이 지목 투표</h2>
+                        <p className="text-center text-xs text-red-200 mb-4">과반수 지목 시 게임 즉시 종료</p>
+                        <div className="space-y-2 mb-4 max-h-[50vh] overflow-y-auto">
                             {players.map(p => {
                                 const count = voteCounts[p.uid] || 0;
                                 const isSelected = myVote === p.uid;
                                 return (
                                     <button key={p.uid} onClick={() => onVote(p.uid)} disabled={myVote === p.uid}
-                                        className={`w-full flex justify-between items-center p-4 rounded-xl border transition-all ${isSelected ? 'bg-red-600 border-red-400' : 'bg-black/40 border-white/5 hover:bg-white/5'}`}>
-                                        <span className="font-bold">{p.name}</span>
+                                        className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${isSelected ? 'bg-red-600 border-red-400' : 'bg-black/40 border-white/5'}`}>
+                                        <span className="font-bold text-sm">{p.name}</span>
                                         <div className="flex items-center gap-2">
-                                            {count > 0 && <span className="text-xs bg-white/20 px-2 py-1 rounded">{count}표</span>}
-                                            {isSelected && <i data-lucide="check-circle" className="w-5 h-5"></i>}
+                                            {count > 0 && <span className="text-xs bg-white/20 px-2 py-0.5 rounded">{count}표</span>}
+                                            {isSelected && <i data-lucide="check-circle" className="w-4 h-4"></i>}
                                         </div>
                                     </button>
                                 );
                             })}
                         </div>
-                        <button onClick={onClose} className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold">닫기</button>
+                        <button onClick={onClose} className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold text-sm">닫기</button>
                     </div>
                 </div>
             );
         };
 
-        // 에러 경계
+        // 에러 방어
         class ErrorBoundary extends React.Component {
-            constructor(props) {
-                super(props);
-                this.state = { hasError: false, error: null, errorInfo: null };
-            }
-            static getDerivedStateFromError(error) { return { hasError: true, error }; }
-            componentDidCatch(error, errorInfo) { 
-                this.setState({ error, errorInfo });
-                console.error("Crash detected:", error, errorInfo); 
-            }
-            handleReset = () => {
-                if(confirm("모든 데이터를 초기화하고 새로고침 하시겠습니까?")) {
-                    localStorage.clear();
-                    window.location.reload();
-                }
-            }
+            constructor(props) { super(props); this.state = { hasError: false }; }
+            static getDerivedStateFromError(error) { return { hasError: true }; }
+            componentDidCatch(error) { console.error("Crash:", error); }
             render() {
                 if (this.state.hasError) {
-                    return (
-                        <div className="spy-bg flex items-center justify-center text-center p-6">
-                            <div className="glass-card p-8 rounded-3xl w-full max-w-md">
-                                <h1 className="text-3xl font-black mb-4 text-red-500">🚫 오류 발생!</h1>
-                                <p className="text-gray-300 mb-4 font-bold text-lg">앱이 예기치 않게 종료되었습니다.</p>
-                                <div className="bg-black/50 p-4 rounded-xl text-left text-xs font-mono text-red-300 mb-6 overflow-auto max-h-40">
-                                    {this.state.error && this.state.error.toString()}
-                                </div>
-                                <div className="flex gap-3">
-                                    <button onClick={() => window.location.reload()} className="flex-1 bg-white/10 px-6 py-3 rounded-xl font-bold hover:bg-white/20">새로고침</button>
-                                    <button onClick={this.handleReset} className="flex-1 bg-red-600/80 px-6 py-3 rounded-xl font-bold hover:bg-red-600">데이터 초기화</button>
-                                </div>
-                            </div>
-                        </div>
-                    );
+                    return <div className="spy-bg flex items-center justify-center p-6 text-center"><div className="glass-card p-6 rounded-xl"><h1 className="text-red-500 font-bold mb-2">오류 발생</h1><button onClick={() => window.location.reload()} className="bg-white/10 px-4 py-2 rounded-lg">새로고침</button></div></div>;
                 }
                 return this.props.children;
             }
         }
 
-        const ConnectionStatus = () => {
-            const [connected, setConnected] = useState(false);
-            useEffect(() => {
-                if (!database) return;
-                const connectedRef = database.ref('.info/connected');
-                const listener = connectedRef.on('value', (snap) => setConnected(snap.val() === true));
-                return () => connectedRef.off('value', listener);
-            }, []);
-            if (!isFirebaseConfigured) return null;
-            return (
-                <div className={`fixed top-4 left-4 px-3 py-1.5 rounded-full text-xs font-bold border flex items-center gap-2 z-50 transition-colors ${connected ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
-                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
-                    {connected ? '온라인' : '오프라인'}
-                </div>
-            );
-        };
-
         function App() {
-            let statusText = "게임 대기 중 ...";
+            // 상태 관리
             const [userId] = useState(() => {
                 const stored = localStorage.getItem('spyfall_user_id');
                 if (stored) return stored;
@@ -387,30 +289,29 @@
             const [view, setView] = useState('lobby'); 
             const [roomId, setRoomId] = useState(''); 
             const [inputRoomId, setInputRoomId] = useState(''); 
-            
             const [nickname, setNickname] = useState(localStorage.getItem('spyfall_nickname') || '');
+            
             const [roomData, setRoomData] = useState(null);
-            const [error, setError] = useState('');
             const [messages, setMessages] = useState([]);
             const [chatInput, setChatInput] = useState('');
             
+            // 모달 상태
             const [showRoleModal, setShowRoleModal] = useState(false);
             const [showResultModal, setShowResultModal] = useState(false);
-            const [turnNotification, setTurnNotification] = useState(null);
-            
-            // [기능] 새로운 모달 상태
             const [showLocationModal, setShowLocationModal] = useState(false);
             const [showVoteModal, setShowVoteModal] = useState(false);
+            const [turnNotification, setTurnNotification] = useState(null);
 
+            // 설정
             const [gameTimeOpt, setGameTimeOpt] = useState(8);
-            const [turnTimeOpt, setTurnTimeOpt] = useState(40); // 기본값 살짝 늘림
+            const [turnTimeOpt, setTurnTimeOpt] = useState(40);
 
             const lastTurnTimeRef = useRef(0);
 
             useEffect(() => { if (nickname) localStorage.setItem('spyfall_nickname', nickname); }, [nickname]);
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, showRoleModal, showResultModal, showLocationModal, showVoteModal, roomData, turnNotification]);
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, showRoleModal, showResultModal, roomData]);
 
-            // [기능] 설정 변경 동기화
+            // 설정 동기화
             useEffect(() => {
                 if (roomData?.settings) {
                     setGameTimeOpt(roomData.settings.gameDuration / 60000);
@@ -418,23 +319,20 @@
                 }
             }, [roomData?.settings]);
 
-            // [기능] 투표 결과 체크
+            // 투표 체크
             useEffect(() => {
                 if (roomData?.votes && roomData?.status === 'playing') {
                     const players = Object.keys(roomData.players);
                     const votes = Object.values(roomData.votes);
                     const voteCounts = {};
                     votes.forEach(v => voteCounts[v] = (voteCounts[v] || 0) + 1);
-                    
                     const majority = Math.floor(players.length / 2) + 1;
                     const elected = Object.keys(voteCounts).find(uid => voteCounts[uid] >= majority);
-
-                    if (elected) {
-                        handleEndGame(`투표 결과, ${roomData.players[elected].name}님이 체포되었습니다!`);
-                    }
+                    if (elected) handleEndGame(`투표 결과, ${roomData.players[elected].name}님이 체포되었습니다!`);
                 }
             }, [roomData?.votes]);
 
+            // 페이즈 관리
             useEffect(() => {
                 if (roomData?.status === 'playing') {
                     if (!showRoleModal && view !== 'game') setShowRoleModal(true);
@@ -442,29 +340,26 @@
                 } else if (roomData?.status === 'finished') {
                     setShowResultModal(true);
                     setShowRoleModal(false);
-                    setTurnNotification(null);
                     setShowVoteModal(false);
-                } else if (roomData?.status === 'waiting') {
-                    setShowResultModal(false);
-                    setShowRoleModal(false);
-                    setTurnNotification(null);
                 }
             }, [roomData?.status]);
 
+            // 턴 알림
             useEffect(() => {
                 if (roomData?.status === 'playing' && roomData.gameState) {
                     const { turnStartTime, turnPlayer, targetPlayer } = roomData.gameState;
                     if (turnStartTime > lastTurnTimeRef.current) {
                         lastTurnTimeRef.current = turnStartTime;
                         if (turnPlayer === userId && !targetPlayer) {
-                            setTurnNotification({ type: 'ask', title: '🗣️ 질문 차례!', message: '원하는 사람을 지목하고 질문하세요.', color: 'bg-blue-600 border-blue-400' });
+                            setTurnNotification({ type: 'ask', title: '🗣️ 질문 차례!', message: '원하는 사람을 지목하세요.', color: 'bg-blue-600 border-blue-400' });
                         } else if (targetPlayer === userId) {
-                            setTurnNotification({ type: 'answer', title: '💬 답변 차례!', message: '질문에 대답하고 턴을 넘기세요.', color: 'bg-orange-600 border-orange-400' });
+                            setTurnNotification({ type: 'answer', title: '💬 답변 차례!', message: '질문에 대답하세요.', color: 'bg-orange-600 border-orange-400' });
                         }
                     }
                 }
             }, [roomData, userId]);
 
+            // Firebase 연결
             useEffect(() => {
                 if (!roomId || !database) return;
                 const roomRef = database.ref('rooms/' + roomId);
@@ -475,15 +370,14 @@
                     const data = snapshot.val();
                     if (data) {
                         setRoomData(data);
-                        localStorage.setItem('spyfall_current_room', roomId);
                     } else {
                         alert('방이 종료되었습니다.');
                         leaveRoomCleanup();
                     }
                 });
 
-                const chatListener = chatRef.limitToLast(100).on('value', (snapshot) => {
-                    const data = snapshot.val();
+                const chatListener = chatRef.limitToLast(100).on('value', snap => {
+                    const data = snap.val();
                     setMessages(data ? Object.values(data) : []);
                 });
 
@@ -496,20 +390,15 @@
                 };
             }, [roomId]);
 
+            // 액션 핸들러
             const leaveRoomCleanup = async () => {
                 if (roomId && database) {
-                    try {
-                        await database.ref(`rooms/${roomId}/messages`).push({
-                            sender: 'System', text: `${nickname}님이 퇴장하셨습니다.`, timestamp: Date.now(), type: 'system'
-                        });
-                    } catch(e) {}
+                    try { await database.ref(`rooms/${roomId}/messages`).push({ sender: 'System', text: `${nickname} 퇴장`, timestamp: Date.now(), type: 'system' }); } catch(e){}
                     await database.ref('rooms/' + roomId + '/players/' + userId).remove();
-                    localStorage.removeItem('spyfall_current_room');
-                    setRoomId(''); setRoomData(null); setMessages([]); setView('lobby');
+                    setRoomId(''); setRoomData(null); setView('lobby');
                 }
             };
 
-            // [기능] 설정 변경
             const handleUpdateSettings = async (type, value) => {
                 if (!roomId || roomData.hostId !== userId) return;
                 const updates = {};
@@ -519,120 +408,97 @@
             };
 
             const handleCreateRoom = async () => {
-                if (!isFirebaseConfigured) return alert("Firebase 키 설정이 필요합니다!");
-                if (!nickname.trim()) return setError('닉네임 필수');
+                if (!nickname.trim()) return alert('닉네임 필수');
                 const newId = generateRoomCode();
-                try {
-                    await database.ref('rooms/' + newId).set({
-                        hostId: userId,
-                        players: { [userId]: { uid: userId, name: nickname, role: null, isSpy: false } },
-                        status: 'waiting',
-                        createdAt: Date.now(),
-                        settings: { gameDuration: gameTimeOpt * 60 * 1000, turnDuration: turnTimeOpt * 1000 },
-                        votes: {}
-                    });
-                    await database.ref(`rooms/${newId}/messages`).push({ sender: 'System', text: `${nickname}님이 방을 만들었습니다.`, timestamp: Date.now(), type: 'system' });
-                    setRoomId(newId); setInputRoomId(newId); setView('room');
-                } catch (e) { alert("방 생성 실패!"); console.error(e); }
+                await database.ref('rooms/' + newId).set({
+                    hostId: userId,
+                    players: { [userId]: { uid: userId, name: nickname, role: null, isSpy: false } },
+                    status: 'waiting',
+                    settings: { gameDuration: gameTimeOpt * 60 * 1000, turnDuration: turnTimeOpt * 1000 },
+                    votes: {}
+                });
+                setRoomId(newId); setInputRoomId(newId); setView('room');
             };
 
             const handleJoinRoom = async () => {
-                if (!isFirebaseConfigured) return alert("Firebase 키 설정 필요");
-                if (!nickname.trim() || !inputRoomId.trim()) return setError('정보 입력 필수');
+                if (!nickname.trim() || !inputRoomId.trim()) return alert('정보 입력 필수');
                 const targetId = inputRoomId.toUpperCase();
-                try {
-                    const snap = await database.ref('rooms/' + targetId).once('value');
-                    const data = snap.val();
-                    if (!data) return setError('없는 방입니다.');
-                    if (data.status === 'playing') return setError('이미 시작됨');
-                    await database.ref(`rooms/${targetId}/players/${userId}`).set({ uid: userId, name: nickname, role: null, isSpy: false });
-                    await database.ref(`rooms/${targetId}/messages`).push({ sender: 'System', text: `${nickname}님이 입장하셨습니다.`, timestamp: Date.now(), type: 'system' });
-                    setRoomId(targetId); setView('room');
-                } catch (e) { alert("접속 실패!"); }
+                const snap = await database.ref('rooms/' + targetId).once('value');
+                if (!snap.exists()) return alert('없는 방입니다.');
+                await database.ref(`rooms/${targetId}/players/${userId}`).set({ uid: userId, name: nickname, role: null, isSpy: false });
+                setRoomId(targetId); setView('room');
             };
 
+            // 💥 [수정] 게임 시작 시 튕김 방지: 안전하게 데이터 업데이트
             const handleStartGame = async () => {
                 const players = Object.values(roomData.players || {});
                 if (players.length < 3) return alert('최소 3명 필요');
+                
                 const location = getRandomLocation();
                 let roles = [...location.roles].sort(() => Math.random() - 0.5);
                 const spyIndex = Math.floor(Math.random() * players.length);
                 const updatedPlayers = {};
-                const firstPlayerId = players[Math.floor(Math.random() * players.length)].uid;
+                
+                // 플레이어 데이터 보존하며 역할 할당
                 players.forEach((p, idx) => {
-                    updatedPlayers[p.uid] = { ...p, role: idx === spyIndex ? 'SPY' : roles.pop() || '시민', isSpy: idx === spyIndex };
+                    updatedPlayers[p.uid] = { 
+                        ...p, 
+                        role: idx === spyIndex ? 'SPY' : roles.pop() || '시민', 
+                        isSpy: idx === spyIndex 
+                    };
                 });
+                
+                const firstPlayerId = players[Math.floor(Math.random() * players.length)].uid;
+                
+                // 한 번에 업데이트 (트랜잭션 대신 update 사용으로 안전성 확보)
                 await database.ref('rooms/' + roomId).update({
-                    status: 'playing', locationName: location.place, players: updatedPlayers, messages: null, votes: {},
+                    status: 'playing',
+                    locationName: location.place,
+                    players: updatedPlayers,
+                    votes: {},
                     gameState: { gameStartTime: Date.now(), turnStartTime: Date.now(), turnPlayer: firstPlayerId, targetPlayer: null }
                 });
-                await database.ref(`rooms/${roomId}/messages`).push({ sender: 'System', text: `게임 시작! (${roomData.settings?.gameDuration/60000}분)`, timestamp: Date.now(), type: 'system' });
+                
+                await database.ref(`rooms/${roomId}/messages`).push({ sender: 'System', text: `게임 시작!`, timestamp: Date.now(), type: 'system' });
                 lastTurnTimeRef.current = 0; 
             };
 
-            const handleEndGame = async (reason = "") => { 
-                await database.ref('rooms/' + roomId).update({ status: 'finished', endReason: reason }); 
-            };
-
+            const handleEndGame = async (reason = "") => { await database.ref('rooms/' + roomId).update({ status: 'finished', endReason: reason }); };
+            
             const handleRestart = async () => {
                 const players = Object.values(roomData.players || {});
                 const resetPlayers = {};
                 players.forEach(p => resetPlayers[p.uid] = { ...p, role: null, isSpy: false });
-                await database.ref('rooms/' + roomId + '/messages').remove();
                 await database.ref('rooms/' + roomId).update({ status: 'waiting', locationName: null, players: resetPlayers, gameState: null, votes: {} });
             };
 
             const handleSelectPlayer = async (targetId) => {
-                if (!roomData?.gameState) return;
                 await database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: targetId, turnStartTime: Date.now() });
             };
-
-            // [기능] 투표 로직
+            
             const handleVote = async (targetUid) => {
                 await database.ref(`rooms/${roomId}/votes/${userId}`).set(targetUid);
             };
 
-            // [기능] 시간 줄이기
             const handleReduceGameTime = async () => {
                 const currentStart = roomData.gameState.gameStartTime;
                 await database.ref(`rooms/${roomId}/gameState`).update({ gameStartTime: currentStart - 60000 });
-                sendMessageLocal("⏰ 방장이 시간을 1분 줄였습니다.", "system");
+                sendMessageLocal("⏰ 시간 -1분", "system");
             };
 
-            // [기능] 턴 스킵
             const handleSkipTurn = async () => {
-                const { turnPlayer, targetPlayer } = roomData.gameState;
+                const { turnPlayer } = roomData.gameState;
                 const playerIds = Object.keys(roomData.players);
-                // 랜덤하게 다음 사람 넘김
                 const candidates = playerIds.filter(id => id !== turnPlayer);
                 const randomTarget = candidates[Math.floor(Math.random() * candidates.length)];
-                await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: userId, targetPlayer: randomTarget, turnStartTime: Date.now() }); // 임시로 내 턴 처리 후 넘김 방지 등을 위해 로직 단순화
                 
-                // 실제로는 그냥 타겟을 랜덤 지정하거나 턴 플레이어를 바꿈
-                if (!targetPlayer) {
-                   await database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: randomTarget, turnStartTime: Date.now() });
-                } else {
-                   await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: targetPlayer, targetPlayer: null, turnStartTime: Date.now() });
-                }
-                sendMessageLocal("⏩ 방장이 턴을 스킵했습니다.", "system");
+                // 턴 강제 변경
+                await database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: null, turnPlayer: randomTarget, turnStartTime: Date.now() });
+                sendMessageLocal("⏩ 턴 스킵됨", "system");
             };
 
-            const handleGameTimeExpire = () => { if (roomData.hostId === userId) handleEndGame(); };
-
-            const handleTurnTimeExpire = () => {
-                if (roomData.hostId !== userId || !roomData.gameState) return;
-                const { turnPlayer, targetPlayer } = roomData.gameState;
-                const playerIds = Object.keys(roomData.players);
-                if (!targetPlayer) {
-                    const candidates = playerIds.filter(id => id !== turnPlayer);
-                    if (candidates.length > 0) {
-                        const randomTarget = candidates[Math.floor(Math.random() * candidates.length)];
-                        database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: randomTarget, turnStartTime: Date.now() });
-                    }
-                } else {
-                    database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: targetPlayer, targetPlayer: null, turnStartTime: Date.now() });
-                }
-            };
+            const handleGameTimeExpire = () => { if (roomData.hostId === userId) handleEndGame("시간 종료!"); };
+            const handleTurnTimeExpire = () => { if (roomData.hostId === userId) handleSkipTurn(); };
 
             const sendMessageLocal = (text, type='chat') => {
                  database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text, timestamp: Date.now(), type });
@@ -649,34 +515,37 @@
                 await database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text: chatInput, timestamp: Date.now(), type: msgType });
                 setChatInput('');
                 if (msgType === 'answer') {
-                    // 답변 후 자동 턴 넘김
                     await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: userId, targetPlayer: null, turnStartTime: Date.now() });
                 }
             };
 
-            const copyCode = () => { navigator.clipboard ? navigator.clipboard.writeText(roomId).then(() => alert('코드 복사됨')) : prompt("방 코드", roomId); };
+            // --- 렌더링 ---
 
-            // --- UI ---
-
-            if (!isFirebaseConfigured) return <div className="spy-bg flex items-center justify-center p-6 text-center text-white font-bold">⚠️ 설정 필요: API KEY를 확인하세요.</div>;
+            if (!isFirebaseConfigured) return <div className="spy-bg flex items-center justify-center p-6 text-white font-bold">API KEY 설정 필요</div>;
 
             if (view === 'lobby') {
                 return (
                     <div className="spy-bg flex items-center justify-center p-4">
-                        <ConnectionStatus />
                         <div className="w-full max-w-sm glass-card p-6 rounded-3xl text-center shadow-2xl relative z-10">
-                            <div className="mb-6"><div className="text-5xl mb-2 drop-shadow-lg animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1><p className="text-xs text-white/30 font-mono mt-2">Ver 5.6 Safe Connect</p></div>
+                            <div className="mb-6"><div className="text-5xl mb-2 animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1></div>
                             <div className="space-y-3">
-                                <div><label className="text-xs text-gray-400 font-bold block text-left ml-2 mb-1">닉네임</label><input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="이름을 입력하세요" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all placeholder-gray-600" /></div>
+                                <input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="닉네임" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-center font-bold" />
                                 <div className="bg-white/5 rounded-xl p-3 text-left space-y-2 border border-white/5">
-                                    <div className="flex justify-between items-center"><label className="text-xs text-gray-400 font-bold flex items-center gap-1"><i data-lucide="clock" className="w-3 h-3"></i> 전체 게임</label><select value={gameTimeOpt} onChange={e => setGameTimeOpt(Number(e.target.value))} className="bg-black/40 text-white text-xs rounded px-2 py-1 outline-none border border-white/10 w-20"><option value={5}>5분</option><option value={8}>8분</option><option value={10}>10분</option><option value={15}>15분</option><option value={20}>20분</option></select></div>
-                                    <div className="flex justify-between items-center"><label className="text-xs text-gray-400 font-bold flex items-center gap-1"><i data-lucide="hourglass" className="w-3 h-3"></i> 턴 시간</label><select value={turnTimeOpt} onChange={e => setTurnTimeOpt(Number(e.target.value))} className="bg-black/40 text-white text-xs rounded px-2 py-1 outline-none border border-white/10 w-20"><option value={20}>20초</option><option value={30}>30초</option><option value={40}>40초</option><option value={60}>60초</option><option value={90}>90초</option></select></div>
+                                    <div className="flex justify-between items-center"><span className="text-xs text-gray-400 font-bold">⏱️ 게임 시간</span>
+                                        <select value={gameTimeOpt} onChange={e => setGameTimeOpt(Number(e.target.value))} className="bg-black/40 text-white text-xs rounded px-2 py-1 outline-none border border-white/10 w-20">
+                                            {[3,4,5,6,7,8,10,12,15].map(t => <option key={t} value={t}>{t}분</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex justify-between items-center"><span className="text-xs text-gray-400 font-bold">⏳ 턴 시간</span>
+                                        <select value={turnTimeOpt} onChange={e => setTurnTimeOpt(Number(e.target.value))} className="bg-black/40 text-white text-xs rounded px-2 py-1 outline-none border border-white/10 w-20">
+                                            {[20,30,40,50,60,90].map(t => <option key={t} value={t}>{t}초</option>)}
+                                        </select>
+                                    </div>
                                 </div>
-                                {error && <div className="text-red-400 text-xs font-bold bg-red-500/10 py-2 rounded-lg animate-pulse">{error}</div>}
                                 <div className="pt-2 space-y-3">
-                                    <button onClick={handleCreateRoom} className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white py-3 rounded-xl font-bold shadow-lg shadow-red-900/20 active:scale-95 transition-all flex items-center justify-center gap-2"><i data-lucide="plus" className="w-5 h-5"></i> 새로운 방 만들기</button>
-                                    <div className="relative flex items-center py-1"><div className="flex-grow border-t border-white/10"></div><span className="flex-shrink-0 mx-2 text-gray-500 text-xs">OR</span><div className="flex-grow border-t border-white/10"></div></div>
-                                    <div className="flex gap-2 h-20"><input value={inputRoomId} onChange={e => setInputRoomId(e.target.value.toUpperCase())} placeholder="A1B2" maxLength={4} className="w-24 bg-black/40 border border-white/10 rounded-xl px-2 text-center uppercase text-white font-black text-xl focus:outline-none focus:border-blue-500 transition-all placeholder-gray-700" /><button onClick={handleJoinRoom} className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-black text-3xl shadow-lg shadow-blue-900/30 active:scale-95 transition-all flex items-center justify-center gap-2"><i data-lucide="log-in" className="w-8 h-8"></i> 참가</button></div>
+                                    <button onClick={handleCreateRoom} className="w-full bg-red-600 hover:bg-red-500 text-white py-3 rounded-xl font-bold shadow-lg">방 만들기</button>
+                                    <div className="flex gap-2 h-14"><input value={inputRoomId} onChange={e => setInputRoomId(e.target.value.toUpperCase())} placeholder="코드" className="w-24 bg-black/40 border border-white/10 rounded-xl px-2 text-center uppercase text-white font-black text-xl" />
+                                    <button onClick={handleJoinRoom} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold">참가</button></div>
                                 </div>
                             </div>
                         </div>
@@ -685,167 +554,151 @@
             }
 
             if (view === 'room' || view === 'game' || view === 'result') {
-                if (!roomData) {
-                    setTimeout(() => { const el = document.getElementById('loading-msg'); if(el) el.innerText = "연결이 지연되고 있습니다... (새로고침 권장)"; }, 5000);
-                    return <div className="spy-bg flex items-center justify-center flex-col"><div className="spinner mb-4"></div><div id="loading-msg" className="text-white font-bold animate-pulse">데이터 로딩 중...</div></div>;
+                // 💥 튕김 방지: 데이터가 로드되지 않았거나 내 정보가 없을 때 로딩 처리
+                if (!roomData || (roomData.players && !roomData.players[userId])) {
+                     return <div className="spy-bg flex items-center justify-center flex-col"><div className="spinner mb-4"></div><div className="text-white font-bold animate-pulse">동기화 중...</div></div>;
                 }
                 
-                const players = Object.values(roomData.players || {});
+                const players = Object.values(roomData.players);
                 const isHost = roomData.hostId === userId;
-                const me = roomData.players ? roomData.players[userId] : null;
+                const me = roomData.players[userId];
                 const gameState = roomData.gameState;
-                const gameDuration = roomData.settings?.gameDuration || 8 * 60 * 1000;
-                const turnDuration = roomData.settings?.turnDuration || 20 * 1000;
-
-                if (!me) return <div className="spy-bg flex items-center justify-center flex-col p-4 text-center text-white"><h2 className="text-xl font-bold mb-4">연결 끊김</h2><button onClick={leaveRoomCleanup} className="bg-white/20 px-6 py-3 rounded-xl">나가기</button></div>;
-
                 const isPlaying = roomData.status === 'playing';
-                const isMyTurn = gameState?.turnPlayer === userId;
-                const isMyTargetTurn = gameState?.targetPlayer === userId;
-                const isMyTurnToAsk = isPlaying && isMyTurn && !gameState.targetPlayer;
                 
-                let chatPlaceholder = "메시지 입력...";
+                // 내 차례인지 확인 (뱃지 로직 수정됨)
+                const isMyTurnToAsk = isPlaying && gameState?.turnPlayer === userId && !gameState?.targetPlayer;
+
+                let statusText = "대기 중...";
                 if (isPlaying && gameState) {
                     if (!gameState.targetPlayer) {
                         const tp = roomData.players[gameState.turnPlayer];
-                        statusText = `🗣️ ${tp?.name || '???'}님이 질문하는 중...`;
-                        chatPlaceholder = !isMyTurn ? "질문자가 발언 중입니다" : (messages.some(m => m.uid === userId && m.type === 'question' && m.timestamp > gameState.turnStartTime) ? "👉 질문 완료! 대상을 지목하세요!" : "질문을 입력하세요");
+                        statusText = `🗣️ ${tp?.name}님 질문 중`;
                     } else {
                         const tp = roomData.players[gameState.targetPlayer];
-                        statusText = `💬 ${tp?.name || '???'}님이 답변하는 중...`;
-                        chatPlaceholder = !isMyTargetTurn ? "답변자가 답변 중입니다" : "답변을 입력하세요 (엔터 시 턴 넘김)";
+                        statusText = `💬 ${tp?.name}님 답변 중`;
                     }
                 }
 
                 return (
-                    <div className="spy-bg p-4 flex flex-col h-screen">
-                        <ConnectionStatus />
-                        <div className="max-w-5xl mx-auto w-full h-full flex flex-col relative">
-                            {/* 상단바 */}
-                            <div className="glass-card p-3 rounded-2xl mb-3 flex justify-between items-center shrink-0">
-                                <div><span className="text-[10px] text-gray-400 font-bold block">ROOM CODE</span><span className="text-xl font-black text-yellow-400 tracking-widest">{roomId}</span></div>
-                                <div className="hidden md:block text-sm font-bold text-white/80 animate-pulse">{statusText}</div>
-                                <div className="flex gap-2">
-                                    {/* [기능] 장소 족보 버튼 */}
-                                    <button onClick={() => setShowLocationModal(true)} className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"><i data-lucide="map" className="w-3 h-3"></i> 족보</button>
-                                    <button onClick={copyCode} className="bg-white/10 px-3 py-1.5 rounded-lg text-sm font-bold text-white border border-white/10">복사</button>
-                                    <button onClick={leaveRoomCleanup} className="bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-sm font-bold border border-red-500/20">나가기</button>
+                    <div className="spy-bg p-3 flex flex-col h-full">
+                        <div className="max-w-xl mx-auto w-full h-full flex flex-col relative">
+                            {/* 헤더 */}
+                            <div className="glass-card p-2 rounded-xl mb-2 flex justify-between items-center shrink-0">
+                                <div><span className="text-[10px] text-gray-400 font-bold block">CODE</span><span className="text-lg font-black text-yellow-400 tracking-widest">{roomId}</span></div>
+                                <div className="text-sm font-bold text-white/90">{statusText}</div>
+                                <div className="flex gap-1">
+                                    <button onClick={() => setShowLocationModal(true)} className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-1 rounded text-xs font-bold">족보</button>
+                                    <button onClick={leaveRoomCleanup} className="bg-red-500/20 text-red-400 border border-red-500/20 px-2 py-1 rounded text-xs font-bold">나가기</button>
                                 </div>
                             </div>
-                            
-                            {/* [기능] 대기실 설정 변경 */}
+
+                            {/* 설정 변경 (대기실) */}
                             {!isPlaying && roomData.status === 'waiting' && (
-                                <div className="glass-card p-4 rounded-2xl mb-3 text-center">
-                                    <div className="text-gray-400 text-xs font-bold mb-3 uppercase tracking-wider">Game Settings (방장 변경 가능)</div>
-                                    <div className="flex gap-4 justify-center">
-                                        <div className="flex flex-col gap-1">
-                                            <label className="text-xs text-gray-500">전체 시간 (분)</label>
-                                            <select disabled={!isHost} value={gameTimeOpt} onChange={e => handleUpdateSettings('game', e.target.value)} className="bg-black/30 border border-white/10 rounded px-3 py-2 text-white font-bold disabled:opacity-50">
-                                                <option value="5">5분</option><option value="8">8분</option><option value="10">10분</option><option value="15">15분</option>
-                                            </select>
-                                        </div>
-                                        <div className="flex flex-col gap-1">
-                                            <label className="text-xs text-gray-500">턴 제한 (초)</label>
-                                            <select disabled={!isHost} value={turnTimeOpt} onChange={e => handleUpdateSettings('turn', e.target.value)} className="bg-black/30 border border-white/10 rounded px-3 py-2 text-white font-bold disabled:opacity-50">
-                                                <option value="20">20초</option><option value="30">30초</option><option value="40">40초</option><option value="60">60초</option><option value="90">90초</option>
-                                            </select>
-                                        </div>
+                                <div className="glass-card p-3 rounded-xl mb-2">
+                                    <div className="flex gap-2 justify-center">
+                                        <select disabled={!isHost} value={gameTimeOpt} onChange={e => handleUpdateSettings('game', e.target.value)} className="bg-black/30 border border-white/10 rounded px-2 py-1 text-white text-xs w-20">
+                                            {[3,4,5,6,7,8,10,12,15].map(t => <option key={t} value={t}>{t}분</option>)}
+                                        </select>
+                                        <select disabled={!isHost} value={turnTimeOpt} onChange={e => handleUpdateSettings('turn', e.target.value)} className="bg-black/30 border border-white/10 rounded px-2 py-1 text-white text-xs w-20">
+                                            {[20,30,40,50,60].map(t => <option key={t} value={t}>{t}초</option>)}
+                                        </select>
                                     </div>
+                                    {isHost && players.length >= 3 && <button onClick={handleStartGame} className="mt-2 w-full bg-green-600 py-2 rounded-lg font-bold text-white shadow-lg animate-pulse">게임 시작</button>}
+                                    {isHost && players.length < 3 && <div className="mt-2 text-center text-xs text-gray-500">3명 이상 필요</div>}
                                 </div>
                             )}
 
                             {/* 타이머 */}
-                            {roomData.status === 'playing' && gameState && (
-                                <div className="glass-card p-3 rounded-2xl mb-3 shrink-0">
-                                    <TimerBar startTime={gameState.gameStartTime} duration={gameDuration} onExpire={handleGameTimeExpire} label="전체 시간" colorClass="bg-gradient-to-r from-indigo-500 to-purple-500" showControl={isHost} onReduce={handleReduceGameTime} />
-                                    <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-2">
-                                        <div className="flex-1"><TimerBar startTime={gameState.turnStartTime} duration={turnDuration} onExpire={handleTurnTimeExpire} label={`턴 제한시간 (${turnDuration/1000}초)`} colorClass="bg-gradient-to-r from-orange-500 to-red-500" /></div>
-                                        {isHost && <button onClick={handleSkipTurn} className="bg-white/10 p-2 rounded-lg text-xs font-bold text-gray-300 whitespace-nowrap hover:bg-white/20">⏩ 스킵</button>}
+                            {isPlaying && gameState && (
+                                <div className="glass-card p-2 rounded-xl mb-2 shrink-0">
+                                    <TimerBar startTime={gameState.gameStartTime} duration={roomData.settings.gameDuration} onExpire={handleGameTimeExpire} label="전체 시간" colorClass="bg-indigo-500" showControl={isHost} onReduce={handleReduceGameTime} />
+                                    <div className="mt-1 pt-1 border-t border-white/10 flex items-center gap-2">
+                                        <div className="flex-1"><TimerBar startTime={gameState.turnStartTime} duration={roomData.settings.turnDuration} onExpire={handleTurnTimeExpire} label="턴 시간" colorClass="bg-orange-500" /></div>
+                                        {isHost && <button onClick={handleSkipTurn} className="bg-white/10 px-2 py-1 rounded text-[10px] text-gray-300">스킵</button>}
                                     </div>
                                 </div>
                             )}
 
-                            {/* 역할 팝업 */}
-                            {showRoleModal && (
+                            {/* 플레이어 그리드 (뱃지 오류 수정됨) */}
+                            {isPlaying && (
+                                <div className="grid grid-cols-3 gap-2 mb-2 shrink-0">
+                                    {players.map(p => {
+                                        const isTurn = gameState.turnPlayer === p.uid && !gameState.targetPlayer;
+                                        const isTarget = gameState.targetPlayer === p.uid;
+                                        return (
+                                            <div key={p.uid} className={`p-2 rounded-lg text-center relative border transition-all ${isTurn ? 'bg-blue-900/40 border-blue-500 shadow-lg shadow-blue-500/20' : isTarget ? 'bg-orange-900/40 border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-black/20 border-white/5'}`}>
+                                                <div className="text-xs font-bold truncate text-gray-300 flex items-center justify-center gap-1">
+                                                    {p.uid === roomData.hostId && <span className="text-yellow-400 text-[10px]">👑</span>}
+                                                    {p.name}
+                                                </div>
+                                                {isTurn && <div className="text-[10px] text-blue-300 font-bold mt-1">질문 중</div>}
+                                                {isTarget && <div className="text-[10px] text-orange-300 font-bold mt-1">답변 중</div>}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+
+                            {/* 채팅 영역 (flex-1로 남은 공간 채움) */}
+                            <div className="flex-1 min-h-0 mb-2">
+                                <ChatArea messages={messages} chatInput={chatInput} setChatInput={setChatInput} sendMessage={sendMessage} myNickname={nickname} 
+                                    placeholderText={isMyTurnToAsk ? "질문을 입력하세요!" : "대화 참여..."} 
+                                />
+                            </div>
+
+                            {/* 하단 버튼 */}
+                            {isPlaying && (
+                                <div className="flex gap-2 shrink-0 mb-safe">
+                                    <button onClick={() => setShowRoleModal(true)} className="flex-1 bg-white/5 py-3 rounded-xl text-sm font-bold border border-white/10">내 역할</button>
+                                    <button onClick={() => setShowVoteModal(true)} className="flex-1 bg-red-600/20 text-red-400 py-3 rounded-xl text-sm font-bold border border-red-500/30">투표하기</button>
+                                </div>
+                            )}
+
+                            {/* 모달들 */}
+                            {showRoleModal && me && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6 modal-enter" onClick={() => setShowRoleModal(false)}>
-                                    <div className={`w-full max-w-sm p-8 rounded-[2rem] text-center shadow-2xl border-2 relative overflow-hidden ${me.isSpy ? 'bg-gradient-to-b from-red-900 to-black border-red-500' : 'bg-gradient-to-b from-blue-900 to-black border-blue-500'}`} onClick={e => e.stopPropagation()}>
-                                        <div className="text-7xl mb-6 filter drop-shadow-lg">{me.isSpy ? '🤫' : '📍'}</div><h2 className="text-3xl font-black mb-2 text-white">{me.isSpy ? '당신은 스파이!' : '당신의 역할'}</h2>{me.isSpy ? <p className="text-red-200 bg-red-950/50 p-4 rounded-xl mt-4">장소를 모릅니다.<br/>눈치껏 행동하세요!</p> : <div className="mt-6 space-y-4"><div><div className="text-xs text-blue-300 uppercase">Role</div><div className="text-3xl font-bold text-white">{me.role}</div></div><div className="h-px bg-white/10 w-1/2 mx-auto"></div><div><div className="text-xs text-blue-300 uppercase">Location</div><div className="text-2xl font-bold text-yellow-400">{roomData.locationName}</div></div></div>}<button onClick={() => setShowRoleModal(false)} className="mt-8 w-full bg-white/10 hover:bg-white/20 py-3 rounded-xl font-bold text-white border border-white/10">닫기</button>
+                                    <div className={`w-full max-w-sm p-6 rounded-3xl text-center border-2 ${me.isSpy ? 'bg-red-950 border-red-500' : 'bg-slate-900 border-blue-500'}`} onClick={e => e.stopPropagation()}>
+                                        <div className="text-5xl mb-4">{me.isSpy ? '🕵️' : '📍'}</div>
+                                        <h2 className="text-2xl font-black text-white mb-2">{me.isSpy ? '당신은 스파이' : '시민 (장소 확인)'}</h2>
+                                        {!me.isSpy && <div className="text-2xl font-bold text-yellow-400 mb-1">{roomData.locationName}</div>}
+                                        <div className="text-sm text-gray-300">{me.role}</div>
+                                        <button onClick={() => setShowRoleModal(false)} className="mt-6 w-full bg-white/10 py-3 rounded-xl font-bold">확인</button>
                                     </div>
                                 </div>
                             )}
-
-                            {/* [기능] 지목 팝업 (내 턴이고 질문을 했을 때) */}
+                            
+                            {showLocationModal && <LocationModal onClose={() => setShowLocationModal(false)} />}
+                            
+                            {/* 지목 팝업 (내 턴 + 질문완료 시 자동 노출) */}
                             {isMyTurnToAsk && messages.some(m => m.uid === userId && m.type === 'question' && m.timestamp > gameState.turnStartTime) && (
                                 <PlayerSelectionModal players={players.filter(p => p.uid !== userId)} onSelect={handleSelectPlayer} />
                             )}
                             
-                            {/* [기능] 장소 족보 모달 */}
-                            {showLocationModal && <LocationModal onClose={() => setShowLocationModal(false)} />}
+                            {showVoteModal && <VoteModal players={players} votes={roomData.votes} myVote={(roomData.votes || {})[userId]} onVote={handleVote} onClose={() => setShowVoteModal(false)} />}
                             
-                            {/* [기능] 투표 모달 */}
-                            {showVoteModal && (
-                                <VoteModal players={players} votes={roomData.votes} myVote={(roomData.votes || {})[userId]} onVote={handleVote} onClose={() => setShowVoteModal(false)} />
-                            )}
-
-                            {/* 역할 확인 버튼 + 투표 버튼 */}
-                            {roomData.status === 'playing' && (
-                                <div className="flex gap-2 mb-3 shrink-0">
-                                    <button onClick={() => setShowRoleModal(true)} className="flex-1 bg-white/5 hover:bg-white/10 p-2 rounded-xl font-bold text-gray-300 text-xs flex items-center justify-center gap-2 border border-white/5 transition-colors"><i data-lucide="id-card" className="w-4 h-4"></i> 내 역할</button>
-                                    <button onClick={() => setShowVoteModal(true)} className="flex-1 bg-red-600/20 text-red-400 border border-red-500/30 p-2 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-red-600 hover:text-white transition-colors"><i data-lucide="alert-triangle" className="w-4 h-4"></i> 스파이 투표</button>
-                                </div>
-                            )}
-
-                            {/* 플레이어 목록 */}
-                            <div className="glass-card rounded-2xl p-3 mb-3 shrink-0">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                    {players.map(p => {
-                                        const isTurn = gameState?.turnPlayer === p.uid;
-                                        const isTarget = gameState?.targetPlayer === p.uid;
-                                        return (
-                                            <div key={p.uid} className={`p-2 rounded-xl text-center text-sm font-bold border transition-all relative ${isTurn ? 'glow-blue bg-blue-900/30 text-blue-100' : isTarget ? 'glow-orange bg-orange-900/30 text-orange-100' : 'border-transparent bg-black/20'}`}>
-                                                {isTurn && <span className="absolute -top-1 -left-1 text-[9px] bg-blue-600 text-white px-1 rounded-full shadow-lg">질문</span>}
-                                                {isTarget && <span className="absolute -top-1 -right-1 text-[9px] bg-orange-600 text-white px-1 rounded-full shadow-lg">답변</span>}
-                                                <div className="truncate">{p.name} {p.uid === userId && '(나)'}</div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* 채팅 & 로그 */}
-                            <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-3 mb-16 md:mb-20">
-                                <div className="flex-1 h-full"><ChatArea messages={messages} chatInput={chatInput} setChatInput={setChatInput} sendMessage={sendMessage} myNickname={nickname} placeholderText={chatPlaceholder} /></div>
-                                <div className="flex-1 h-full hidden md:block"><PlayerLog players={players} messages={messages} /></div>
-                            </div>
-
-                            {/* 턴 알림 */}
                             {turnNotification && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6 modal-enter" onClick={() => setTurnNotification(null)}>
-                                    <div className={`w-full max-w-sm p-8 rounded-[2rem] text-center shadow-2xl border-4 ${turnNotification.color} bg-gray-900 relative`} onClick={e => e.stopPropagation()}>
-                                        <div className="text-6xl mb-4 animate-bounce">{turnNotification.type === 'ask' ? '🗣️' : '💬'}</div><h2 className="text-3xl font-black mb-3 text-white">{turnNotification.title}</h2><p className="text-gray-300 text-lg mb-8 font-medium leading-relaxed">{turnNotification.message}</p><button onClick={() => setTurnNotification(null)} className="w-full bg-white text-black py-4 rounded-xl font-bold text-lg hover:bg-gray-200 transition-colors">확인했습니다 (닫기)</button>
-                                    </div>
-                                </div>
-                            )}
-                            
-                            {/* 결과 화면 */}
-                            {showResultModal && (
-                                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6 modal-enter">
-                                    <div className="glass-card w-full max-w-md rounded-3xl p-6 max-h-[90vh] overflow-y-auto border border-white/20">
-                                        <h2 className="text-3xl font-black text-center mb-1 text-yellow-400">게임 종료</h2>
-                                        <p className="text-center text-white/50 text-sm mb-4">{roomData.endReason}</p>
-                                        <div className="bg-white/10 rounded-xl p-3 my-4 text-center"><div className="text-xs text-gray-400">장소</div><div className="text-2xl font-bold text-white">{roomData.locationName}</div></div>
-                                        <div className="space-y-3 mb-6">{players.map(p => (<div key={p.uid} className={`flex justify-between items-center p-3 rounded-xl ${p.isSpy ? 'bg-red-900/40 border border-red-500/50' : 'bg-black/30 border border-white/5'}`}><span className="font-bold text-white">{p.name}</span><span className={`font-bold ${p.isSpy ? 'text-red-400' : 'text-blue-300'}`}>{p.isSpy ? '스파이 🕵️' : p.role}</span></div>))}</div>
-                                        <div className="flex gap-3"><button onClick={leaveRoomCleanup} className="flex-1 bg-gray-600 hover:bg-gray-500 py-4 rounded-xl font-bold text-white shadow-lg">메인으로</button>{isHost && <button onClick={handleRestart} className="flex-1 bg-green-600 hover:bg-green-500 py-4 rounded-xl font-bold text-white shadow-lg">새 게임</button>}</div>
+                                    <div className={`w-full max-w-sm p-6 rounded-3xl text-center border-4 ${turnNotification.color} bg-gray-900`}>
+                                        <div className="text-4xl mb-3 animate-bounce">{turnNotification.type === 'ask' ? '🗣️' : '💬'}</div>
+                                        <h2 className="text-2xl font-black text-white">{turnNotification.title}</h2>
+                                        <p className="text-gray-300 mt-2">{turnNotification.message}</p>
                                     </div>
                                 </div>
                             )}
 
-                            {/* 하단 컨트롤 */}
-                            <div className="fixed bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-[#020617] via-[#020617] to-transparent pt-6 z-20 pointer-events-none">
-                                <div className="max-w-5xl mx-auto pointer-events-auto">
-                                    {isHost && (roomData.status === 'playing' ? <button onClick={() => handleEndGame("방장이 게임을 종료했습니다.")} className="w-full bg-red-600 hover:bg-red-500 py-3 rounded-xl font-bold shadow-lg border-t border-red-400 text-white">🛑 게임 종료 및 공개</button> : <button onClick={handleStartGame} disabled={players.length < 3} className="w-full bg-green-600 hover:bg-green-500 disabled:bg-gray-700 py-4 rounded-xl font-bold shadow-lg border-t border-green-400 text-white text-lg">게임 시작 ({players.length}/3)</button>)}
+                            {roomData.status === 'finished' && (
+                                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 p-6 modal-enter">
+                                    <div className="glass-card w-full max-w-md rounded-3xl p-6 text-center">
+                                        <h2 className="text-3xl font-black text-yellow-400 mb-2">GAME OVER</h2>
+                                        <p className="text-white/60 mb-4">{roomData.endReason}</p>
+                                        <div className="bg-white/10 rounded-xl p-3 mb-4"><div className="text-xs text-gray-400">정답 장소</div><div className="text-2xl font-bold text-white">{roomData.locationName}</div></div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => { setView('lobby'); setRoomId(''); }} className="flex-1 bg-gray-600 py-3 rounded-xl font-bold">나가기</button>
+                                            {isHost && <button onClick={handleRestart} className="flex-1 bg-green-600 py-3 rounded-xl font-bold">다시 하기</button>}
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 );
@@ -854,11 +707,7 @@
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(
-            <ErrorBoundary>
-                <App />
-            </ErrorBoundary>
-        );
+        root.render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>
 </body>
 </html>
