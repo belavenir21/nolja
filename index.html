@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>SPYFALL - REMASTERED</title>
     
-    <!-- 라이브러리 로드 -->
     <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
@@ -21,8 +20,8 @@
             background-color: #0f172a; 
             color: #f8fafc; 
             -webkit-tap-highlight-color: transparent; 
-            overflow: hidden; /* 전체 화면 스크롤 금지 */
-            height: 100dvh; /* 모바일 브라우저 높이 대응 */
+            overflow: hidden; 
+            height: 100dvh; 
             display: flex;
             flex-direction: column;
         }
@@ -573,7 +572,7 @@
                                     </div>
                                     <div className="flex justify-between items-center"><span className="text-xs text-gray-400 font-bold">⏳ 턴 시간</span>
                                         <select value={turnTimeOpt} onChange={e => setTurnTimeOpt(Number(e.target.value))} className="bg-black/40 text-white text-xs rounded px-2 py-1 outline-none border border-white/10 w-20">
-                                            {[20,30,40,50,60,90].map(t => <option key={t} value={t}>{t}초</option>)}
+                                            {[20,30,40,50,60].map(t => <option key={t} value={t}>{t}초</option>)}
                                         </select>
                                     </div>
                                 </div>
