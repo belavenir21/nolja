@@ -38,6 +38,8 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useLayoutEffect } = React;
 
+        // 🚨🚨🚨 [중요] 아래 설정을 본인 Firebase 콘솔 내용으로 '전부' 교체하세요! 🚨🚨🚨
+        // API Key만 바꾸면 안됩니다! projectId, databaseURL도 본인 것이어야 합니다.
         const firebaseConfig = {
             apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM", 
             authDomain: "spyfall-b107.firebaseapp.com",
@@ -48,13 +50,19 @@
             appId: "1:35799604494:web:9558db68aa6c5347d60b5f",
             measurementId: "G-HYQR22H174"
         };
+        
 
-        let isFirebaseConfigured = false;
-        if (firebaseConfig.apiKey) {
-            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-            isFirebaseConfigured = true;
+        // Firebase 초기화 로직 (설정값이 있으면 무조건 시도)
+        if (!firebase.apps.length && firebaseConfig.apiKey) {
+            try {
+                firebase.initializeApp(firebaseConfig);
+            } catch (e) {
+                console.error("Firebase Init Error:", e);
+                alert("Firebase 설정 오류: 콘솔을 확인하세요.");
+            }
         }
-        const database = isFirebaseConfigured ? firebase.database() : null;
+        
+        const database = firebase.apps.length ? firebase.database() : null;
 
         const SPYFALL_DATA = {
             hospital: { place: "🏥 종합병원", roles: ["외과 의사", "간호사", "환자", "병원장", "구급대원", "약사", "청소부", "보호자"] },
@@ -244,6 +252,7 @@
                                 );
                             })}
                         </div>
+                        {/* 투표 닫기 버튼 삭제: 투표는 강제 진행 */}
                     </div>
                 </div>
             );
@@ -274,7 +283,7 @@
             return (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 modal-enter" onClick={onClose}>
                     <div className="glass-card w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl p-6 relative border-2 border-yellow-500/30" onClick={e => e.stopPropagation()}>
-                        <div className="absolute top-4 right-4"><button onClick={onClose} className="bg-white/10 p-2 rounded-full"><i data-lucide="x" className="w-5 h-5"></i></button></div>
+                        <button onClick={onClose} className="absolute top-4 right-4 bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors z-[110]"><i data-lucide="x" className="w-5 h-5"></i></button>
                         <h2 className="text-3xl font-black text-yellow-400 mb-6 text-center">📜 {isLiar ? '라이어 게임' : '스파이폴'} 규칙</h2>
                         <div className="space-y-6">
                             <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
@@ -324,6 +333,7 @@
             const [showResultModal, setShowResultModal] = useState(false);
             const [showLocationModal, setShowLocationModal] = useState(false);
             const [showRuleModal, setShowRuleModal] = useState(false);
+            const [showVoteModal, setShowVoteModal] = useState(false);
             const [turnNotification, setTurnNotification] = useState(null);
             const [pendingAnswer, setPendingAnswer] = useState(null);
             const [gameTimeOpt, setGameTimeOpt] = useState(8);
@@ -347,13 +357,10 @@
                 }
             }, [roomData?.settings]);
 
-            // 🔥 시간 단축 투표 체크 (과반수 확인)
             useEffect(() => {
                 if (roomData?.gameState?.timeVotes && roomData.status === 'playing') {
                     const players = Object.keys(roomData.players);
                     const voteCount = Object.keys(roomData.gameState.timeVotes).length;
-                    
-                    // 과반수 이상이면 투표 페이즈로 바로 이동
                     if (voteCount >= Math.ceil(players.length / 2)) {
                         startVotingPhase();
                     }
@@ -452,19 +459,25 @@
 
             const handleCreateRoom = async () => {
                 if (!nickname.trim()) return alert('닉네임 필수');
+                if (!database) return alert("Firebase 연결 실패");
                 const newId = generateRoomCode();
-                await database.ref('rooms/' + newId).set({
-                    hostId: userId,
-                    players: { [userId]: { uid: userId, name: nickname, role: null, isSpy: false } },
-                    status: 'waiting',
-                    settings: { gameDuration: gameTimeOpt * 60 * 1000, turnDuration: turnTimeOpt * 1000, maxPlayers: 12, gameMode: 'spyfall', rounds: 3 },
-                    votes: {}
-                });
-                setRoomId(newId); setInputRoomId(newId); setView('room');
+                try {
+                    await database.ref('rooms/' + newId).set({
+                        hostId: userId,
+                        players: { [userId]: { uid: userId, name: nickname, role: null, isSpy: false } },
+                        status: 'waiting',
+                        settings: { gameDuration: gameTimeOpt * 60 * 1000, turnDuration: turnTimeOpt * 1000, maxPlayers: 12, gameMode: 'spyfall', rounds: 3 },
+                        votes: {}
+                    });
+                    setRoomId(newId); setInputRoomId(newId); setView('room');
+                } catch (e) {
+                    alert("방 생성 오류: " + e.message);
+                }
             };
 
             const handleJoinRoom = async () => {
                 if (!nickname.trim() || !inputRoomId.trim()) return alert('정보 입력 필수');
+                if (!database) return alert("Firebase 연결 실패");
                 const targetId = inputRoomId.toUpperCase();
                 const snap = await database.ref('rooms/' + targetId).once('value');
                 if (!snap.exists()) return alert('없는 방입니다.');
@@ -543,13 +556,6 @@
                 try { await database.ref(`rooms/${roomId}/votes/${userId}`).set(targetUid); } catch(e) { console.error(e); }
             };
 
-            const handleReduceGameTime = async () => {
-                const currentStart = roomData.gameState.gameStartTime;
-                await database.ref(`rooms/${roomId}/gameState`).update({ gameStartTime: currentStart - 60000 });
-                sendMessageLocal("⏰ 시간 -1분", "system");
-            };
-
-            // 🔥 [신규] 시간 단축 투표 토글
             const handleTimeReductionToggle = async () => {
                 const timeVotes = roomData.gameState.timeVotes || {};
                 if (timeVotes[userId]) {
@@ -596,7 +602,6 @@
             const sendMessage = async (e) => {
                 e.preventDefault();
                 if (!chatInput.trim()) return;
-                
                 let msgType = 'chat';
                 if (roomData?.status === 'playing' && roomData.gameState) {
                     if(gameMode === 'spyfall') {
@@ -604,12 +609,10 @@
                         else if (roomData.gameState.targetPlayer === userId) msgType = 'answer';
                     }
                 }
-
                 if (msgType === 'answer' && gameMode === 'spyfall') {
                     setPendingAnswer(chatInput);
                     return;
                 }
-
                 await database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text: chatInput, timestamp: Date.now(), type: msgType });
                 setChatInput('');
             };
@@ -633,7 +636,7 @@
                 return (
                     <div className="spy-bg flex items-center justify-center p-4">
                         <div className="w-full max-w-sm glass-card p-6 rounded-3xl text-center shadow-2xl relative z-10">
-                            <button onClick={() => setShowRuleModal(true)} className="absolute top-4 right-4 bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors"><i data-lucide="book-open" className="w-5 h-5 text-yellow-400"></i></button>
+                            <button onClick={() => setShowRuleModal(true)} className="absolute top-4 right-4 bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors z-50"><i data-lucide="book-open" className="w-5 h-5 text-yellow-400"></i></button>
                             <div className="mb-6"><div className="text-5xl mb-2 animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">PARTY GAMES</h1></div>
                             <div className="space-y-3">
                                 <input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="닉네임" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-center font-bold" />
@@ -691,7 +694,6 @@
                     statusText = "🚨 투표 진행 중...";
                 }
 
-                // 시간 단축 투표 카운트 계산
                 const timeVotes = gameState?.timeVotes ? Object.keys(gameState.timeVotes).length : 0;
                 const totalPlayers = players.length;
                 const hasVotedTime = gameState?.timeVotes?.[userId];
@@ -801,7 +803,6 @@
                                 <div className="flex gap-2 shrink-0 mb-safe">
                                     <button onClick={() => setShowRoleModal(true)} className="flex-1 bg-white/5 py-3 rounded-xl text-sm font-bold border border-white/10">내 역할</button>
                                     
-                                    {/* 🔥 시간 단축 투표 버튼 */}
                                     <button onClick={handleTimeReductionToggle} 
                                         className={`flex-1 py-3 rounded-xl text-sm font-bold border transition-colors ${hasVotedTime ? 'bg-blue-600 border-blue-400 text-white' : 'bg-blue-900/30 border-blue-500/30 text-blue-300'}`}>
                                         ⏱️ 시간 단축 {timeVotes}/{Math.ceil(players.length/2)}
