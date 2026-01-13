@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>SPYFALL - REMASTERED</title>
     
+    <!-- 라이브러리 로드 -->
     <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
@@ -21,7 +22,7 @@
             color: #f8fafc; 
             -webkit-tap-highlight-color: transparent; 
             overflow: hidden; 
-            height: 100dvh; /* 모바일 대응 높이 */
+            height: 100dvh; 
         }
         .spy-bg { 
             background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0f172a 60%, #020617 100%);
@@ -44,10 +45,11 @@
         .glow-orange { box-shadow: 0 0 15px rgba(249, 115, 22, 0.6); border-color: #fb923c; }
         .progress-bar { transition: width 1s linear; }
         
+        /* 채팅 스크롤바 커스텀 */
         .chat-scroll::-webkit-scrollbar { width: 4px; }
         .chat-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+        .chat-scroll::-webkit-scrollbar-track { background: transparent; }
         
-        /* 로딩 스피너 */
         .spinner { border: 4px solid rgba(255, 255, 255, 0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #3b82f6; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
@@ -62,14 +64,13 @@
 
         // 🚨 [주의] 본인의 Firebase 설정값을 넣어주세요 🚨
         const firebaseConfig = {
-            apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM", // 본인 키 입력
-            authDomain: "spyfall-b107.firebaseapp.com",
-            databaseURL: "https://spyfall-b107-default-rtdb.firebaseio.com",
-            projectId: "spyfall-b107",
-            storageBucket: "spyfall-b107.firebasestorage.app",
-            messagingSenderId: "35799604494",
-            appId: "1:35799604494:web:9558db68aa6c5347d60b5f",
-            measurementId: "G-HYQR22H174"
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "SENDER_ID",
+            appId: "APP_ID"
         };
 
         let isFirebaseConfigured = false;
@@ -80,7 +81,6 @@
         
         const database = isFirebaseConfigured ? firebase.database() : null;
 
-        // 장소 데이터
         const GAME_DATA = {
             hospital: { place: "🏥 종합병원", roles: ["외과 의사", "수간호사", "응급 환자", "병원장", "구급대원", "약사", "청소부", "보호자"] },
             school: { place: "🏫 고등학교", roles: ["담임 선생님", "전교 회장", "체육 선생님", "교장 선생님", "매점 이모", "잠자는 학생", "전학생", "양호 선생님"] },
@@ -151,29 +151,46 @@
             );
         };
 
-        // 채팅창: 키보드 가림 방지를 위해 flex-grow 사용
+        // 💬 [수정] 채팅창: 높이 고정 및 스크롤 개선, 말풍선 그룹화
         const ChatArea = ({ messages, chatInput, setChatInput, sendMessage, myNickname, placeholderText }) => {
             const chatEndRef = useRef(null);
-            useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+            
+            // 새 메시지 왔을 때만 스크롤
+            useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
 
             return (
-                <div className="flex flex-col h-full bg-black/30 rounded-2xl border border-white/10 overflow-hidden shadow-inner relative">
+                <div className="flex flex-col h-full bg-black/30 rounded-2xl border border-white/10 overflow-hidden shadow-inner relative flex-1 min-h-0">
                     <div className="bg-white/5 p-2 px-3 border-b border-white/10 text-[10px] font-bold text-gray-400 uppercase flex items-center gap-2 shrink-0">
                         <i data-lucide="message-square" className="w-3 h-3"></i> LIVE CHAT
                     </div>
-                    <div className="flex-1 overflow-y-auto p-3 space-y-2 chat-scroll">
+                    
+                    {/* flex-1과 overflow-y-auto를 조합하여 스크롤 영역 확보 */}
+                    <div className="flex-1 overflow-y-auto p-3 space-y-1 chat-scroll">
                         {messages.length === 0 && <div className="text-white/20 text-center text-xs py-8">대화 시작...</div>}
+                        
                         {messages.map((msg, i) => {
-                            if (msg.type === 'system') return <div key={i} className="flex justify-center my-1"><span className="text-[10px] text-white/40 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">{msg.text}</span></div>;
+                            if (msg.type === 'system') {
+                                return <div key={i} className="flex justify-center my-2"><span className="text-[10px] text-white/40 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">{msg.text}</span></div>;
+                            }
+                            
                             const isMe = msg.sender === myNickname;
+                            const prevMsg = messages[i - 1];
+                            // 이전 메시지와 보낸 사람, 타입이 같으면 닉네임 숨김 (연속 말풍선)
+                            const isSameSender = prevMsg && prevMsg.sender === msg.sender && prevMsg.type === msg.type && prevMsg.type !== 'system';
+
                             return (
-                                <div key={i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                    <div className="flex items-center gap-1 mb-0.5">
-                                        <span className="text-[10px] font-bold px-1" style={{ color: getUserColor(msg.uid) }}>{msg.sender}</span>
-                                        {msg.type === 'question' && <span className="text-[8px] bg-blue-500/20 text-blue-300 px-1 rounded border border-blue-500/30">질문</span>}
-                                        {msg.type === 'answer' && <span className="text-[8px] bg-orange-500/20 text-orange-300 px-1 rounded border border-orange-500/30">답변</span>}
-                                    </div>
-                                    <div className={`px-3 py-2 rounded-xl text-sm max-w-[90%] break-words shadow-sm leading-relaxed border ${isMe ? 'bg-white/10 text-white rounded-tr-none border-white/10' : 'bg-black/40 text-gray-300 rounded-tl-none border-white/5'} ${msg.type === 'question' ? '!border-blue-500/50 !bg-blue-900/30' : ''} ${msg.type === 'answer' ? '!border-orange-500/50 !bg-orange-900/30' : ''}`}>
+                                <div key={i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isSameSender ? 'mt-0.5' : 'mt-2'}`}>
+                                    {!isSameSender && (
+                                        <div className="flex items-center gap-1 mb-0.5">
+                                            <span className="text-[10px] font-bold px-1" style={{ color: getUserColor(msg.uid) }}>{msg.sender}</span>
+                                            {msg.type === 'question' && <span className="text-[8px] bg-blue-500/20 text-blue-300 px-1 rounded border border-blue-500/30">질문</span>}
+                                            {msg.type === 'answer' && <span className="text-[8px] bg-orange-500/20 text-orange-300 px-1 rounded border border-orange-500/30">답변</span>}
+                                        </div>
+                                    )}
+                                    <div className={`px-3 py-2 rounded-xl text-sm max-w-[90%] break-words shadow-sm leading-relaxed border 
+                                        ${isMe ? 'bg-white/10 text-white border-white/10 rounded-tr-none' : 'bg-black/40 text-gray-300 border-white/5 rounded-tl-none'} 
+                                        ${msg.type === 'question' ? '!border-blue-500/50 !bg-blue-900/30' : ''} 
+                                        ${msg.type === 'answer' ? '!border-orange-500/50 !bg-orange-900/30' : ''}`}>
                                         {msg.text}
                                     </div>
                                 </div>
@@ -181,6 +198,7 @@
                         })}
                         <div ref={chatEndRef} />
                     </div>
+                    
                     <form onSubmit={sendMessage} className="p-2 bg-black/40 border-t border-white/10 flex gap-2 shrink-0">
                         <input value={chatInput} onChange={e => setChatInput(e.target.value)} 
                             className="flex-1 bg-white/5 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all placeholder-gray-600"
@@ -425,6 +443,14 @@
                 const targetId = inputRoomId.toUpperCase();
                 const snap = await database.ref('rooms/' + targetId).once('value');
                 if (!snap.exists()) return alert('없는 방입니다.');
+                
+                // 중복 닉네임 체크
+                const data = snap.val();
+                if (data.players) {
+                    const isDuplicate = Object.values(data.players).some(p => p.name === nickname.trim());
+                    if (isDuplicate) return alert('이미 사용 중인 닉네임입니다.');
+                }
+                
                 await database.ref(`rooms/${targetId}/players/${userId}`).set({ uid: userId, name: nickname, role: null, isSpy: false });
                 setRoomId(targetId); setView('room');
             };
@@ -473,6 +499,14 @@
             };
 
             const handleSelectPlayer = async (targetId) => {
+                // 질문 했는지 체크
+                const { turnStartTime } = roomData.gameState;
+                const hasAsked = messages.some(m => m.uid === userId && m.type === 'question' && m.timestamp > turnStartTime);
+                
+                if (!hasAsked) {
+                     alert("🗣️ 먼저 질문을 입력하세요!");
+                     return;
+                }
                 await database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: targetId, turnStartTime: Date.now() });
             };
             
@@ -492,7 +526,6 @@
                 const candidates = playerIds.filter(id => id !== turnPlayer);
                 const randomTarget = candidates[Math.floor(Math.random() * candidates.length)];
                 
-                // 턴 강제 변경
                 await database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: null, turnPlayer: randomTarget, turnStartTime: Date.now() });
                 sendMessageLocal("⏩ 턴 스킵됨", "system");
             };
@@ -512,11 +545,17 @@
                     if (roomData.gameState.turnPlayer === userId && !roomData.gameState.targetPlayer) msgType = 'question';
                     else if (roomData.gameState.targetPlayer === userId) msgType = 'answer';
                 }
-                await database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text: chatInput, timestamp: Date.now(), type: msgType });
-                setChatInput('');
+                
+                // 답변자가 답변 입력 시
                 if (msgType === 'answer') {
-                    await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: userId, targetPlayer: null, turnStartTime: Date.now() });
+                     // 메시지 전송 후 즉시 턴 넘김
+                     await database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text: chatInput, timestamp: Date.now(), type: msgType });
+                     await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: userId, targetPlayer: null, turnStartTime: Date.now() });
+                } else {
+                     // 질문 혹은 일반 채팅
+                     await database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text: chatInput, timestamp: Date.now(), type: msgType });
                 }
+                setChatInput('');
             };
 
             // --- 렌더링 ---
@@ -567,15 +606,32 @@
                 
                 // 내 차례인지 확인 (뱃지 로직 수정됨)
                 const isMyTurnToAsk = isPlaying && gameState?.turnPlayer === userId && !gameState?.targetPlayer;
+                const isMyTurnToAnswer = isPlaying && gameState?.targetPlayer === userId;
 
+                // 🚨 statusText 선언 및 로직 위치 변경 (렌더링 직전)
                 let statusText = "대기 중...";
+                let placeholderText = "대화 참여...";
+
                 if (isPlaying && gameState) {
                     if (!gameState.targetPlayer) {
                         const tp = roomData.players[gameState.turnPlayer];
                         statusText = `🗣️ ${tp?.name}님 질문 중`;
+                        
+                        if (isMyTurnToAsk) {
+                             const hasAsked = messages.some(m => m.uid === userId && m.type === 'question' && m.timestamp > gameState.turnStartTime);
+                             placeholderText = hasAsked ? "👉 상대를 지목하세요!" : "질문을 입력하세요";
+                        } else {
+                             placeholderText = "질문자가 발언 중입니다";
+                        }
                     } else {
                         const tp = roomData.players[gameState.targetPlayer];
                         statusText = `💬 ${tp?.name}님 답변 중`;
+                        
+                        if (isMyTurnToAnswer) {
+                             placeholderText = "답변을 입력하세요";
+                        } else {
+                             placeholderText = "답변자가 발언 중입니다";
+                        }
                     }
                 }
 
@@ -625,14 +681,20 @@
                                     {players.map(p => {
                                         const isTurn = gameState.turnPlayer === p.uid && !gameState.targetPlayer;
                                         const isTarget = gameState.targetPlayer === p.uid;
+                                        // 내가 질문자이고 질문을 완료했을 때만 선택 가능
+                                        const canSelect = isMyTurnToAsk && messages.some(m => m.uid === userId && m.type === 'question' && m.timestamp > gameState.turnStartTime) && p.uid !== userId;
+
                                         return (
-                                            <div key={p.uid} className={`p-2 rounded-lg text-center relative border transition-all ${isTurn ? 'bg-blue-900/40 border-blue-500 shadow-lg shadow-blue-500/20' : isTarget ? 'bg-orange-900/40 border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-black/20 border-white/5'}`}>
+                                            <div key={p.uid} onClick={() => canSelect && handleSelectPlayer(p.uid)} 
+                                                className={`p-2 rounded-lg text-center relative border transition-all ${isTurn ? 'bg-blue-900/40 border-blue-500 shadow-lg shadow-blue-500/20' : isTarget ? 'bg-orange-900/40 border-orange-500 shadow-lg shadow-orange-500/20' : canSelect ? 'bg-white/10 border-white/30 cursor-pointer animate-pulse' : 'bg-black/20 border-white/5'}`}>
                                                 <div className="text-xs font-bold truncate text-gray-300 flex items-center justify-center gap-1">
                                                     {p.uid === roomData.hostId && <span className="text-yellow-400 text-[10px]">👑</span>}
                                                     {p.name}
+                                                    {p.uid === userId && <span className="text-[10px] text-gray-500 ml-1">(나)</span>}
                                                 </div>
                                                 {isTurn && <div className="text-[10px] text-blue-300 font-bold mt-1">질문 중</div>}
                                                 {isTarget && <div className="text-[10px] text-orange-300 font-bold mt-1">답변 중</div>}
+                                                {canSelect && <div className="text-[10px] text-white font-bold mt-1">👆 지목</div>}
                                             </div>
                                         )
                                     })}
@@ -641,8 +703,8 @@
 
                             {/* 채팅 영역 (flex-1로 남은 공간 채움) */}
                             <div className="flex-1 min-h-0 mb-2">
-                                <ChatArea messages={messages} chatInput={chatInput} setChatInput={setChatInput} sendMessage={sendMessage} myNickname={nickname} 
-                                    placeholderText={isMyTurnToAsk ? "질문을 입력하세요!" : "대화 참여..."} 
+                                <ChatArea messages={messages} chatInput={chatInput} setChatInput={setChatInput} sendMessage={sendMessage} myNickname={nickname} 
+                                    placeholderText={placeholderText} 
                                 />
                             </div>
 
