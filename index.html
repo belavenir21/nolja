@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
-    <title>SPYFALL - REMASTERED</title>
+    <title>PARTY GAMES - FINAL</title>
     
     <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -15,63 +15,28 @@
 
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-        body { 
-            font-family: 'Pretendard', sans-serif; 
-            background-color: #0f172a; 
-            color: #f8fafc; 
-            -webkit-tap-highlight-color: transparent; 
-            overflow: hidden; 
-            height: 100dvh; 
-            display: flex;
-            flex-direction: column;
-        }
-        #root {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-        }
-        .spy-bg { 
-            background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0f172a 60%, #020617 100%);
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .glass-card {
-            background: rgba(30, 41, 59, 0.75);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-        }
+        body { font-family: 'Pretendard', sans-serif; background-color: #0f172a; color: #f8fafc; -webkit-tap-highlight-color: transparent; overflow: hidden; height: 100dvh; display: flex; flex-direction: column; }
+        #root { height: 100%; display: flex; flex-direction: column; }
+        .spy-bg { background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0f172a 60%, #020617 100%); flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .glass-card { background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); }
         .modal-enter { animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
         @keyframes modalPop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        
-        /* 토스트 메시지 애니메이션 */
         .toast-enter { animation: toastSlide 0.3s ease-out forwards; }
         @keyframes toastSlide { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-        .glow-blue { box-shadow: 0 0 15px rgba(59, 130, 246, 0.6); border-color: #60a5fa; }
-        .glow-orange { box-shadow: 0 0 15px rgba(249, 115, 22, 0.6); border-color: #fb923c; }
         .progress-bar { transition: width 1s linear; }
-        
         .chat-scroll::-webkit-scrollbar { width: 4px; }
         .chat-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
         .chat-scroll::-webkit-scrollbar-track { background: transparent; }
-        
         .loc-scroll::-webkit-scrollbar { width: 0px; }
-        
         .spinner { border: 4px solid rgba(255, 255, 255, 0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #3b82f6; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
         .card-pop:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
     <div id="root"></div>
-    
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useLayoutEffect } = React;
 
         const firebaseConfig = {
             apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM", 
@@ -89,30 +54,44 @@
             if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
             isFirebaseConfigured = true;
         }
-        
         const database = isFirebaseConfigured ? firebase.database() : null;
 
-        const GAME_DATA = {
-            hospital: { place: "🏥 종합병원", roles: ["외과 의사", "수간호사", "응급 환자", "병원장", "구급대원", "약사", "청소부", "보호자"] },
-            school: { place: "🏫 고등학교", roles: ["담임 선생님", "전교 회장", "체육 선생님", "교장 선생님", "매점 이모", "잠자는 학생", "전학생", "양호 선생님"] },
-            airplane: { place: "✈️ 비행기", roles: ["기장", "승무원", "일등석 승객", "우는 아기", "기내식 요리사", "항공 보안관", "정비사", "부기장"] },
-            pirate: { place: "🏴‍☠️ 해적선", roles: ["해적 선장", "용감한 선원", "포로", "요리사", "조타수", "갑판장", "앵무새", "망원경 보는 선원"] },
-            movie: { place: "🎬 영화 촬영장", roles: ["영화 감독", "주연 배우", "스턴트맨", "카메라 감독", "분장사", "엑스트라", "작가", "조명 감독"] },
-            casino: { place: "🎰 카지노", roles: ["딜러", "부자 손님", "보안 요원", "매니저", "돈 잃은 손님", "바텐더", "타짜", "청소부"] },
-            space: { place: "🚀 우주 정거장", roles: ["우주 비행사", "함장", "외계인 연구원", "엔지니어", "우주 관광객", "AI 로봇", "의무관", "통신 장교"] },
-            army: { place: "⛺ 군부대", roles: ["지휘관", "신병", "취사병", "조교", "의무병", "탈영병", "행보관", "사격 교관"] },
-            opera: { place: "🎭 오페라 하우스", roles: ["오페라 가수", "지휘자", "연주자", "VIP 관객", "무대 감독", "안내원", "매표소 직원", "조명 기사"] },
-            camping: { place: "⛺ 캠핑장", roles: ["고기 굽는 아빠", "뛰어노는 아이", "캠핑장 주인", "술 취한 대학생", "기타 치는 사람", "모기 물린 사람", "장작 파는 사람", "옆 텐트 커플"] },
-            cruise: { place: "🚢 크루즈 유람선", roles: ["선장", "바텐더", "마술사", "신혼부부", "갑부 노인", "수영장 안전요원", "카지노 딜러", "객실 청소부"] },
-            bank: { place: "🏦 은행", roles: ["은행 강도", "지점장", "창구 직원", "대출 상담 받으러 온 사람", "청원 경찰", "ATM 수리기사", "현금 수송 요원", "VIP 고객"] }
+        const SPYFALL_DATA = {
+            hospital: { place: "🏥 종합병원", roles: ["외과 의사", "간호사", "환자", "병원장", "구급대원", "약사", "청소부", "보호자"] },
+            school: { place: "🏫 고등학교", roles: ["담임 교사", "전교 회장", "체육 교사", "교장", "매점 이모", "잠자는 학생", "전학생", "양호 교사"] },
+            airplane: { place: "✈️ 비행기", roles: ["기장", "승무원", "일등석 승객", "아기", "요리사", "보안관", "정비사", "부기장"] },
+            pirate: { place: "🏴‍☠️ 해적선", roles: ["선장", "선원", "포로", "요리사", "조타수", "갑판장", "앵무새", "망원경 선원"] },
+            movie: { place: "🎬 영화 촬영장", roles: ["감독", "주연 배우", "스턴트맨", "카메라", "분장사", "엑스트라", "작가", "조명"] },
+            casino: { place: "🎰 카지노", roles: ["딜러", "부자 손님", "보안 요원", "매니저", "돈 잃은 사람", "바텐더", "타짜", "청소부"] },
+            space: { place: "🚀 우주 정거장", roles: ["우주인", "함장", "외계인", "엔지니어", "관광객", "AI 로봇", "의무관", "통신 장교"] },
+            army: { place: "⛺ 군부대", roles: ["지휘관", "신병", "취사병", "조교", "의무병", "탈영병", "행보관", "교관"] },
+            opera: { place: "🎭 오페라 하우스", roles: ["가수", "지휘자", "연주자", "VIP", "감독", "안내원", "매표소", "조명"] },
+            camping: { place: "⛺ 캠핑장", roles: ["아빠", "아이", "주인", "대학생", "기타맨", "모기 물린 사람", "장작맨", "커플"] },
+            cruise: { place: "🚢 크루즈", roles: ["선장", "바텐더", "마술사", "신혼부부", "갑부", "안전요원", "딜러", "청소부"] },
+            bank: { place: "🏦 은행", roles: ["강도", "지점장", "직원", "대출자", "경찰", "수리기사", "수송 요원", "VIP"] }
+        };
+
+        const LIAR_DATA = {
+            food: { category: "🍕 음식", words: ["김치찌개", "치킨", "피자", "햄버거", "라면", "초밥", "삼겹살", "떡볶이", "짜장면", "스테이크"] },
+            animal: { category: "🦁 동물", words: ["사자", "호랑이", "고양이", "강아지", "코끼리", "기린", "판다", "독수리", "상어", "펭귄"] },
+            job: { category: "💼 직업", words: ["의사", "변호사", "경찰", "소방관", "선생님", "개발자", "요리사", "가수", "배우", "운동선수"] },
+            appliance: { category: "📱 가전제품", words: ["냉장고", "세탁기", "에어컨", "TV", "컴퓨터", "청소기", "전자레인지", "드라이기", "선풍기", "스피커"] },
+            sport: { category: "⚽ 스포츠", words: ["축구", "야구", "농구", "배구", "테니스", "수영", "골프", "탁구", "배드민턴", "복싱"] },
+            fruit: { category: "🍎 과일", words: ["사과", "바나나", "포도", "딸기", "수박", "귤", "복숭아", "파인애플", "멜론", "키위"] },
+            place: { category: "🏞️ 장소", words: ["학교", "병원", "도서관", "공원", "영화관", "카페", "백화점", "놀이공원", "해수욕장", "편의점"] },
+            country: { category: "🌍 나라", words: ["한국", "미국", "일본", "중국", "영국", "프랑스", "독일", "이탈리아", "브라질", "호주"] }
         };
 
         const generateRoomCode = () => Math.random().toString(36).substring(2, 6).toUpperCase();
         const generateUserId = () => 'user_' + Math.random().toString(36).substring(2, 15);
-        const getRandomLocation = () => {
-            const keys = Object.keys(GAME_DATA);
-            return GAME_DATA[keys[Math.floor(Math.random() * keys.length)]];
+        
+        const getRandomData = (mode) => {
+            const data = mode === 'liar' ? LIAR_DATA : SPYFALL_DATA;
+            const keys = Object.keys(data);
+            const key = keys[Math.floor(Math.random() * keys.length)];
+            return data[key];
         };
+
         const getUserColor = (uid) => {
             if (!uid) return '#9ca3af';
             const colors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
@@ -121,49 +100,35 @@
             return colors[Math.abs(hash) % colors.length];
         };
 
-        // --- 컴포넌트 ---
-
         const TimerBar = ({ startTime, duration, onExpire, label, colorClass, showControl, onReduce }) => {
             const [timeLeft, setTimeLeft] = useState(duration);
             const [progress, setProgress] = useState(100);
-
             useEffect(() => {
                 const interval = setInterval(() => {
                     const elapsed = Date.now() - startTime;
                     const remaining = Math.max(0, duration - elapsed);
                     setTimeLeft(remaining);
                     setProgress((remaining / duration) * 100);
-                    if (remaining <= 0) {
-                        clearInterval(interval);
-                        if (onExpire) onExpire();
-                    }
+                    if (remaining <= 0) { clearInterval(interval); if (onExpire) onExpire(); }
                 }, 100);
                 return () => clearInterval(interval);
             }, [startTime, duration]);
-
             const minutes = Math.floor(timeLeft / 60000);
             const seconds = Math.floor((timeLeft % 60000) / 1000);
-
             return (
                 <div className="w-full mb-3">
                     <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-wider">
-                        <span className="flex items-center gap-2">
-                            {label}
-                            {showControl && <button onClick={onReduce} className="bg-red-500/20 hover:bg-red-500/40 text-red-400 px-1.5 py-0.5 rounded border border-red-500/30 transition-colors">-1분</button>}
-                        </span>
-                        <span className={timeLeft < 10000 ? "text-red-500 animate-pulse font-black" : "text-white"}>
-                            {minutes}:{seconds.toString().padStart(2, '0')}
-                        </span>
+                        <span className="flex items-center gap-2">{label} {showControl && <button onClick={onReduce} className="bg-red-500/20 hover:bg-red-500/40 text-red-400 px-1.5 py-0.5 rounded border border-red-500/30 transition-colors">-1분</button>}</span>
+                        <span className={timeLeft < 10000 ? "text-red-500 animate-pulse font-black" : "text-white"}>{minutes}:{seconds.toString().padStart(2, '0')}</span>
                     </div>
-                    <div className="h-2 w-full bg-gray-700/50 rounded-full overflow-hidden">
-                        <div className={`h-full progress-bar ${colorClass}`} style={{ width: `${progress}%` }}></div>
-                    </div>
+                    <div className="h-2 w-full bg-gray-700/50 rounded-full overflow-hidden"><div className={`h-full progress-bar ${colorClass}`} style={{ width: `${progress}%` }}></div></div>
                 </div>
             );
         };
 
         const ChatArea = ({ messages, chatInput, setChatInput, sendMessage, myNickname, placeholderText }) => {
             const chatEndRef = useRef(null);
+            useLayoutEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "auto" }); }, []);
             useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
 
             return (
@@ -175,11 +140,9 @@
                         {messages.length === 0 && <div className="text-white/20 text-center text-xs py-8">대화 시작...</div>}
                         {messages.map((msg, i) => {
                             if (msg.type === 'system') return <div key={i} className="flex justify-center my-2"><span className="text-[10px] text-white/40 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">{msg.text}</span></div>;
-                            
                             const isMe = msg.sender === myNickname;
                             const prevMsg = messages[i - 1];
                             const isSameSender = prevMsg && prevMsg.sender === msg.sender && prevMsg.type === msg.type && prevMsg.type !== 'system';
-
                             return (
                                 <div key={i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isSameSender ? 'mt-0.5' : 'mt-3'}`}>
                                     {!isSameSender && (
@@ -189,12 +152,7 @@
                                             {msg.type === 'answer' && <span className="text-[8px] bg-orange-500/20 text-orange-300 px-1 rounded border border-orange-500/30">답변</span>}
                                         </div>
                                     )}
-                                    <div className={`px-3 py-2 rounded-2xl text-sm max-w-[90%] break-words shadow-sm leading-relaxed border 
-                                        ${isMe ? 'bg-white/10 text-white border-white/10 rounded-tr-sm' : 'bg-black/40 text-gray-300 border-white/5 rounded-tl-sm'} 
-                                        ${msg.type === 'question' ? '!border-blue-500/50 !bg-blue-900/30' : ''} 
-                                        ${msg.type === 'answer' ? '!border-orange-500/50 !bg-orange-900/30' : ''}`}>
-                                        {msg.text}
-                                    </div>
+                                    <div className={`px-3 py-2 rounded-2xl text-sm max-w-[90%] break-words shadow-sm leading-relaxed border ${isMe ? 'bg-white/10 text-white border-white/10 rounded-tr-sm' : 'bg-black/40 text-gray-300 border-white/5 rounded-tl-sm'} ${msg.type === 'question' ? '!border-blue-500/50 !bg-blue-900/30' : ''} ${msg.type === 'answer' ? '!border-orange-500/50 !bg-orange-900/30' : ''}`}>{msg.text}</div>
                                 </div>
                             );
                         })}
@@ -208,38 +166,41 @@
             );
         };
 
-        // 족보 모달 (모바일용)
-        const LocationModal = ({ onClose }) => (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 modal-enter" onClick={onClose}>
-                <div className="glass-card w-full max-w-3xl max-h-[85vh] overflow-y-auto rounded-2xl p-5" onClick={e => e.stopPropagation()}>
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-black text-yellow-400">🗺️ 장소 족보</h2>
-                        <button onClick={onClose} className="bg-white/10 p-2 rounded-full"><i data-lucide="x" className="w-5 h-5"></i></button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                        {Object.values(GAME_DATA).map((loc, i) => (
-                            <div key={i} className="bg-white/5 p-3 rounded-xl border border-white/5">
-                                <div className="font-bold text-sm mb-1 text-gray-200">{loc.place}</div>
-                                <div className="text-[10px] text-gray-500 truncate">{loc.roles.slice(0, 3).join(', ')}...</div>
-                            </div>
-                        ))}
+        const CheatSheetModal = ({ onClose, mode }) => {
+            const data = mode === 'liar' ? LIAR_DATA : SPYFALL_DATA;
+            const title = mode === 'liar' ? '주제별 제시어' : '장소 목록';
+            return (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 modal-enter" onClick={onClose}>
+                    <div className="glass-card w-full max-w-3xl max-h-[85vh] overflow-y-auto rounded-2xl p-5" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-black text-yellow-400">🗺️ {title}</h2>
+                            <button onClick={onClose} className="bg-white/10 p-2 rounded-full"><i data-lucide="x" className="w-5 h-5"></i></button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            {Object.values(data).map((item, i) => (
+                                <div key={i} className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                    <div className="font-bold text-sm mb-1 text-gray-200">{mode === 'liar' ? item.category : item.place}</div>
+                                    <div className="text-[10px] text-gray-500 truncate">{mode === 'liar' ? item.words.slice(0, 4).join(', ') + "..." : item.roles.slice(0, 3).join(', ') + "..."}</div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
-            </div>
-        );
+            );
+        };
 
-        // 사이드 족보 패널 (PC용)
-        const SideLocationPanel = ({ isLeft }) => {
-            const locations = Object.values(GAME_DATA);
-            const displayLocs = isLeft ? locations.slice(0, 6) : locations.slice(6, 12);
-            
+        const SideCheatSheet = ({ isLeft, mode }) => {
+            const data = Object.values(mode === 'liar' ? LIAR_DATA : SPYFALL_DATA);
+            const mid = Math.ceil(data.length / 2);
+            const displayData = isLeft ? data.slice(0, mid) : data.slice(mid);
+            const label = mode === 'liar' ? 'Category' : 'Location';
             return (
                 <div className={`hidden md:flex flex-col w-64 h-full p-2 overflow-y-auto loc-scroll gap-2 ${isLeft ? 'pr-1' : 'pl-1'}`}>
-                    <div className="text-center text-xs font-bold text-gray-500 uppercase mb-2">Location List {isLeft ? '1' : '2'}</div>
-                    {displayLocs.map((loc, i) => (
+                    <div className="text-center text-xs font-bold text-gray-500 uppercase mb-2">{label} List {isLeft ? '1' : '2'}</div>
+                    {displayData.map((item, i) => (
                         <div key={i} className="bg-white/5 p-3 rounded-xl border border-white/5 hover:bg-white/10 transition-colors">
-                            <div className="font-bold text-sm mb-1 text-gray-200">{loc.place}</div>
-                            <div className="text-[10px] text-gray-500 truncate">{loc.roles.slice(0, 3).join(', ')}...</div>
+                            <div className="font-bold text-sm mb-1 text-gray-200">{mode === 'liar' ? item.category : item.place}</div>
+                            <div className="text-[10px] text-gray-500 truncate">{mode === 'liar' ? item.words.slice(0, 4).join(', ') + "..." : item.roles.slice(0, 3).join(', ') + "..."}</div>
                         </div>
                     ))}
                 </div>
@@ -260,22 +221,20 @@
             </div>
         );
 
-        // 🔥 [수정] 투표 모달 오류 수정
-        const VoteModal = ({ players, votes, myVote, onVote, onClose }) => {
+        const VoteModal = ({ players, votes, myVote, onVote, onClose, mode }) => {
             const voteCounts = {};
+            const villainName = mode === 'liar' ? '라이어' : '스파이';
             Object.values(votes || {}).forEach(targetId => { voteCounts[targetId] = (voteCounts[targetId] || 0) + 1; });
             return (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center bg-red-900/90 p-4 modal-enter">
                     <div className="glass-card w-full max-w-md rounded-2xl p-6 border-red-500/30">
-                        <h2 className="text-xl font-black text-red-400 mb-1 text-center">🚨 스파이 지목 투표</h2>
+                        <h2 className="text-xl font-black text-red-400 mb-1 text-center">🚨 {villainName} 지목 투표</h2>
                         <div className="space-y-2 mb-4 max-h-[50vh] overflow-y-auto">
                             {players.map(p => {
                                 const count = voteCounts[p.uid] || 0;
                                 const isSelected = myVote === p.uid;
                                 return (
-                                    <button key={p.uid} onClick={() => onVote(p.uid)} 
-                                        // disabled={myVote === p.uid} // 👈 이 부분을 제거하여 변경 가능하게 함
-                                        className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${isSelected ? 'bg-red-600 border-red-400' : 'bg-black/40 border-white/5'}`}>
+                                    <button key={p.uid} onClick={() => onVote(p.uid)} className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${isSelected ? 'bg-red-600 border-red-400' : 'bg-black/40 border-white/5'}`}>
                                         <span className="font-bold text-sm">{p.name}</span>
                                         <div className="flex items-center gap-2">
                                             {count > 0 && <span className="text-xs bg-white/20 px-2 py-0.5 rounded">{count}표</span>}
@@ -285,18 +244,53 @@
                                 );
                             })}
                         </div>
-                        <button onClick={onClose} className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold text-sm">닫기</button>
                     </div>
                 </div>
             );
         };
 
-        // 토스트 메시지 컴포넌트
+        const AnswerConfirmModal = ({ text, onConfirm, onCancel }) => (
+            <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 p-6 modal-enter">
+                <div className="glass-card w-full max-w-sm rounded-3xl p-6 text-center border-2 border-orange-500">
+                    <h2 className="text-xl font-black text-white mb-2">💬 답변 확인</h2>
+                    <p className="text-xs text-gray-400 mb-4">이 내용으로 답변하고 턴을 넘기시겠습니까?</p>
+                    <div className="bg-white/10 p-4 rounded-xl text-white font-bold text-lg mb-6 break-words">"{text}"</div>
+                    <div className="flex gap-2">
+                        <button onClick={onCancel} className="flex-1 bg-gray-600 py-3 rounded-xl font-bold">수정</button>
+                        <button onClick={onConfirm} className="flex-1 bg-orange-600 hover:bg-orange-500 py-3 rounded-xl font-bold">전송</button>
+                    </div>
+                </div>
+            </div>
+        );
+
         const Toast = ({ message }) => (
             <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-white/90 text-black px-6 py-3 rounded-full font-bold shadow-2xl z-[100] toast-enter flex items-center gap-2">
                 <i data-lucide="check" className="w-5 h-5 text-green-600"></i> {message}
             </div>
         );
+
+        const RuleModal = ({ onClose, mode }) => {
+            const isLiar = mode === 'liar';
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 modal-enter" onClick={onClose}>
+                    <div className="glass-card w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl p-6 relative border-2 border-yellow-500/30" onClick={e => e.stopPropagation()}>
+                        <div className="absolute top-4 right-4"><button onClick={onClose} className="bg-white/10 p-2 rounded-full"><i data-lucide="x" className="w-5 h-5"></i></button></div>
+                        <h2 className="text-3xl font-black text-yellow-400 mb-6 text-center">📜 {isLiar ? '라이어 게임' : '스파이폴'} 규칙</h2>
+                        <div className="space-y-6">
+                            <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                                <h3 className="text-lg font-bold text-blue-300 mb-2">👮 시민의 목표</h3>
+                                <p className="text-sm text-gray-300 leading-relaxed">{isLiar ? "모두가 같은 '제시어'를 받습니다. 제시어가 무엇인지 모르는 '라이어'를 찾아내세요!" : "모두가 같은 '장소'에 있습니다. 장소를 모르는 '스파이'를 찾아내세요!"}</p>
+                            </div>
+                            <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                                <h3 className="text-lg font-bold text-red-400 mb-2">😈 {isLiar ? '라이어' : '스파이'}의 목표</h3>
+                                <p className="text-sm text-gray-300 leading-relaxed">{isLiar ? "당신은 제시어를 모릅니다. 시민들의 대화를 듣고 눈치껏 제시어를 유추하여 들키지 않아야 합니다." : "당신은 장소를 모릅니다. 시민들의 대화를 듣고 눈치껏 장소를 유추해야 합니다."}</p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-4 rounded-xl mt-6 shadow-lg">확인</button>
+                    </div>
+                </div>
+            );
+        };
 
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false }; }
@@ -329,32 +323,55 @@
             const [showRoleModal, setShowRoleModal] = useState(false);
             const [showResultModal, setShowResultModal] = useState(false);
             const [showLocationModal, setShowLocationModal] = useState(false);
-            const [showVoteModal, setShowVoteModal] = useState(false);
+            const [showRuleModal, setShowRuleModal] = useState(false);
             const [turnNotification, setTurnNotification] = useState(null);
+            const [pendingAnswer, setPendingAnswer] = useState(null);
             const [gameTimeOpt, setGameTimeOpt] = useState(8);
             const [turnTimeOpt, setTurnTimeOpt] = useState(40);
-            const [showToast, setShowToast] = useState(false); // 토스트 상태
+            const [maxPlayersOpt, setMaxPlayersOpt] = useState(12);
+            const [roundsOpt, setRoundsOpt] = useState(3);
+            const [gameMode, setGameMode] = useState('spyfall'); 
+            const [showToast, setShowToast] = useState(false); 
             const lastTurnTimeRef = useRef(0);
 
             useEffect(() => { if (nickname) localStorage.setItem('spyfall_nickname', nickname); }, [nickname]);
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, showRoleModal, showResultModal, roomData, showToast]);
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, showRoleModal, showResultModal, roomData, showToast, showRuleModal, gameMode, pendingAnswer]);
 
             useEffect(() => {
                 if (roomData?.settings) {
                     setGameTimeOpt(roomData.settings.gameDuration / 60000);
                     setTurnTimeOpt(roomData.settings.turnDuration / 1000);
+                    if(roomData.settings.maxPlayers) setMaxPlayersOpt(roomData.settings.maxPlayers);
+                    if(roomData.settings.gameMode) setGameMode(roomData.settings.gameMode);
+                    if(roomData.settings.rounds) setRoundsOpt(roomData.settings.rounds);
                 }
             }, [roomData?.settings]);
 
+            // 🔥 시간 단축 투표 체크 (과반수 확인)
             useEffect(() => {
-                if (roomData?.votes && roomData?.status === 'playing') {
+                if (roomData?.gameState?.timeVotes && roomData.status === 'playing') {
+                    const players = Object.keys(roomData.players);
+                    const voteCount = Object.keys(roomData.gameState.timeVotes).length;
+                    
+                    // 과반수 이상이면 투표 페이즈로 바로 이동
+                    if (voteCount >= Math.ceil(players.length / 2)) {
+                        startVotingPhase();
+                    }
+                }
+            }, [roomData?.gameState?.timeVotes]);
+
+            useEffect(() => {
+                if (roomData?.votes && roomData?.status === 'voting') {
                     const players = Object.keys(roomData.players);
                     const votes = Object.values(roomData.votes);
-                    const voteCounts = {};
-                    votes.forEach(v => voteCounts[v] = (voteCounts[v] || 0) + 1);
-                    const majority = Math.floor(players.length / 2) + 1;
-                    const elected = Object.keys(voteCounts).find(uid => voteCounts[uid] >= majority);
-                    if (elected) handleEndGame(`투표 결과, ${roomData.players[elected].name}님이 체포되었습니다!`);
+                    if (votes.length >= players.length) {
+                        const voteCounts = {};
+                        votes.forEach(v => voteCounts[v] = (voteCounts[v] || 0) + 1);
+                        let maxVotes = 0;
+                        let elected = null;
+                        Object.entries(voteCounts).forEach(([uid, count]) => { if (count > maxVotes) { maxVotes = count; elected = uid; } });
+                        handleEndGame(`투표 결과, ${roomData.players[elected].name}님이 지목되었습니다!`);
+                    }
                 }
             }, [roomData?.votes]);
 
@@ -365,7 +382,6 @@
                 } else if (roomData?.status === 'finished') {
                     setShowResultModal(true);
                     setShowRoleModal(false);
-                    setShowVoteModal(false);
                 }
             }, [roomData?.status]);
 
@@ -374,54 +390,51 @@
                     const { turnStartTime, turnPlayer, targetPlayer } = roomData.gameState;
                     if (turnStartTime > lastTurnTimeRef.current) {
                         lastTurnTimeRef.current = turnStartTime;
-                        if (turnPlayer === userId && !targetPlayer) {
-                            setTurnNotification({ type: 'ask', title: '🗣️ 질문 차례!', message: '원하는 사람을 지목하세요.', color: 'bg-blue-600 border-blue-400' });
-                        } else if (targetPlayer === userId) {
-                            setTurnNotification({ type: 'answer', title: '💬 답변 차례!', message: '질문에 대답하세요.', color: 'bg-orange-600 border-orange-400' });
+                        if (gameMode === 'liar') {
+                            if (turnPlayer === userId) {
+                                setTurnNotification({ type: 'ask', title: '🗣️ 발언 차례!', message: '제시어에 대해 설명하세요.', color: 'bg-green-600 border-green-400' });
+                            }
+                        } else {
+                            if (turnPlayer === userId && !targetPlayer) {
+                                setTurnNotification({ type: 'ask', title: '🗣️ 질문 차례!', message: '원하는 사람을 지목하세요.', color: 'bg-blue-600 border-blue-400' });
+                            } else if (targetPlayer === userId) {
+                                setTurnNotification({ type: 'answer', title: '💬 답변 차례!', message: '질문에 대답하세요.', color: 'bg-orange-600 border-orange-400' });
+                            }
                         }
                     }
                 }
-            }, [roomData, userId]);
+            }, [roomData, userId, gameMode]);
 
             useEffect(() => {
                 if (!roomId || !database) return;
                 const roomRef = database.ref('rooms/' + roomId);
                 const chatRef = database.ref('rooms/' + roomId + '/messages');
-                
                 const roomListener = roomRef.on('value', (snapshot) => {
                     const data = snapshot.val();
-                    if (data) {
-                        setRoomData(data);
-                    } else {
-                        if(view !== 'lobby') {
-                            alert('방이 종료되었습니다.');
-                            window.location.reload(); 
-                        }
-                    }
+                    if (data) setRoomData(data);
+                    else { if(view !== 'lobby') { alert('방이 종료되었습니다.'); window.location.reload(); } }
                 });
-
                 const chatListener = chatRef.limitToLast(100).on('value', snap => {
                     const data = snap.val();
                     setMessages(data ? Object.values(data) : []);
                 });
-
                 database.ref('rooms/' + roomId + '/players/' + userId).onDisconnect().remove();
-
-                return () => {
-                    roomRef.off('value', roomListener);
-                    chatRef.off('value', chatListener);
-                };
+                return () => { roomRef.off('value', roomListener); chatRef.off('value', chatListener); };
             }, [roomId]);
 
             const leaveRoomCleanup = async () => {
                 if (roomId && database) {
-                    setRoomId('');
-                    setRoomData(null); 
-                    setMessages([]);
-                    setView('lobby');
+                    setRoomId(''); setRoomData(null); setMessages([]); setView('lobby');
                     try { 
                         await database.ref(`rooms/${roomId}/messages`).push({ sender: 'System', text: `${nickname} 퇴장`, timestamp: Date.now(), type: 'system' }); 
-                        await database.ref('rooms/' + roomId + '/players/' + userId).remove();
+                        const playerRef = database.ref('rooms/' + roomId + '/players/' + userId);
+                        await playerRef.remove();
+                        const roomRef = database.ref('rooms/' + roomId);
+                        const snap = await roomRef.once('value');
+                        if (snap.exists()) {
+                            const data = snap.val();
+                            if (!data.players || Object.keys(data.players).length === 0) await roomRef.remove();
+                        }
                     } catch(e) {}
                 }
             };
@@ -431,6 +444,9 @@
                 const updates = {};
                 if (type === 'game') updates['settings/gameDuration'] = value * 60 * 1000;
                 if (type === 'turn') updates['settings/turnDuration'] = value * 1000;
+                if (type === 'max') updates['settings/maxPlayers'] = Number(value);
+                if (type === 'mode') updates['settings/gameMode'] = value; 
+                if (type === 'rounds') updates['settings/rounds'] = Number(value);
                 await database.ref(`rooms/${roomId}`).update(updates);
             };
 
@@ -441,7 +457,7 @@
                     hostId: userId,
                     players: { [userId]: { uid: userId, name: nickname, role: null, isSpy: false } },
                     status: 'waiting',
-                    settings: { gameDuration: gameTimeOpt * 60 * 1000, turnDuration: turnTimeOpt * 1000 },
+                    settings: { gameDuration: gameTimeOpt * 60 * 1000, turnDuration: turnTimeOpt * 1000, maxPlayers: 12, gameMode: 'spyfall', rounds: 3 },
                     votes: {}
                 });
                 setRoomId(newId); setInputRoomId(newId); setView('room');
@@ -452,6 +468,12 @@
                 const targetId = inputRoomId.toUpperCase();
                 const snap = await database.ref('rooms/' + targetId).once('value');
                 if (!snap.exists()) return alert('없는 방입니다.');
+                const data = snap.val();
+                if (data.players) {
+                    if (Object.keys(data.players).length >= (data.settings?.maxPlayers || 12)) return alert('방이 꽉 찼습니다!');
+                    const isDuplicate = Object.values(data.players).some(p => p.name === nickname.trim());
+                    if (isDuplicate) return alert('이미 사용 중인 닉네임입니다.');
+                }
                 await database.ref(`rooms/${targetId}/players/${userId}`).set({ uid: userId, name: nickname, role: null, isSpy: false });
                 setRoomId(targetId); setView('room');
             };
@@ -459,29 +481,56 @@
             const handleStartGame = async () => {
                 const players = Object.values(roomData.players || {});
                 if (players.length < 3) return alert('최소 3명 필요');
-                const location = getRandomLocation();
-                let roles = [...location.roles].sort(() => Math.random() - 0.5);
+                const mode = roomData.settings.gameMode;
+                const dataItem = getRandomData(mode); 
+                const isLiarMode = mode === 'liar';
+                let roles = [];
+                if (isLiarMode) {
+                    const secretWord = dataItem.words[Math.floor(Math.random() * dataItem.words.length)];
+                    roles = Array(players.length).fill(secretWord); 
+                } else {
+                    roles = [...dataItem.roles].sort(() => Math.random() - 0.5);
+                }
                 const spyIndex = Math.floor(Math.random() * players.length);
                 const updatedPlayers = {};
+                const playerIds = [];
                 players.forEach((p, idx) => {
-                    updatedPlayers[p.uid] = { ...p, role: idx === spyIndex ? 'SPY' : roles.pop() || '시민', isSpy: idx === spyIndex };
+                    const isSpy = idx === spyIndex;
+                    const role = isSpy ? (isLiarMode ? '라이어' : 'SPY') : (isLiarMode ? roles[idx] : (roles.pop() || '시민'));
+                    updatedPlayers[p.uid] = { ...p, role, isSpy };
+                    playerIds.push(p.uid);
                 });
-                const firstPlayerId = players[Math.floor(Math.random() * players.length)].uid;
+                if (isLiarMode) {
+                    for (let i = playerIds.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [playerIds[i], playerIds[j]] = [playerIds[j], playerIds[i]];
+                    }
+                }
+                const firstPlayerId = isLiarMode ? playerIds[0] : players[Math.floor(Math.random() * players.length)].uid;
                 await database.ref('rooms/' + roomId).update({
-                    status: 'playing', locationName: location.place, players: updatedPlayers, votes: {},
-                    gameState: { gameStartTime: Date.now(), turnStartTime: Date.now(), turnPlayer: firstPlayerId, targetPlayer: null }
+                    status: 'playing', 
+                    locationName: isLiarMode ? dataItem.category : dataItem.place, 
+                    players: updatedPlayers, votes: {},
+                    gameState: { gameStartTime: Date.now(), turnStartTime: Date.now(), turnPlayer: firstPlayerId, targetPlayer: null, turnOrder: playerIds, currentTurnIndex: 0, currentRound: 1, timeVotes: {} }
                 });
                 await database.ref(`rooms/${roomId}/messages`).push({ sender: 'System', text: `게임 시작!`, timestamp: Date.now(), type: 'system' });
                 lastTurnTimeRef.current = 0; 
             };
 
             const handleEndGame = async (reason = "") => { await database.ref('rooms/' + roomId).update({ status: 'finished', endReason: reason }); };
+            
+            const startVotingPhase = async () => {
+                await database.ref('rooms/' + roomId).update({ status: 'voting', votes: {} });
+                sendMessageLocal("🚨 투표가 시작되었습니다! 범인을 지목하세요.", "system");
+            };
+
             const handleRestart = async () => {
                 const players = Object.values(roomData.players || {});
                 const resetPlayers = {};
                 players.forEach(p => resetPlayers[p.uid] = { ...p, role: null, isSpy: false });
                 await database.ref('rooms/' + roomId).update({ status: 'waiting', locationName: null, players: resetPlayers, gameState: null, votes: {} });
             };
+
             const handleSelectPlayer = async (targetId) => {
                 const { turnStartTime } = roomData.gameState;
                 const hasAsked = messages.some(m => m.uid === userId && m.type === 'question' && m.timestamp > turnStartTime);
@@ -489,12 +538,9 @@
                 await database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: targetId, turnStartTime: Date.now() });
             };
             
-            // 🔥 [수정] 투표 핸들러 안정화
             const handleVote = async (targetUid) => {
                 if(!database) return;
-                try {
-                    await database.ref(`rooms/${roomId}/votes/${userId}`).set(targetUid);
-                } catch(e) { console.error(e); }
+                try { await database.ref(`rooms/${roomId}/votes/${userId}`).set(targetUid); } catch(e) { console.error(e); }
             };
 
             const handleReduceGameTime = async () => {
@@ -502,49 +548,93 @@
                 await database.ref(`rooms/${roomId}/gameState`).update({ gameStartTime: currentStart - 60000 });
                 sendMessageLocal("⏰ 시간 -1분", "system");
             };
-            const handleSkipTurn = async () => {
-                const { turnPlayer } = roomData.gameState;
-                const playerIds = Object.keys(roomData.players);
-                const candidates = playerIds.filter(id => id !== turnPlayer);
-                const randomTarget = candidates[Math.floor(Math.random() * candidates.length)];
-                await database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: null, turnPlayer: randomTarget, turnStartTime: Date.now() });
-                sendMessageLocal("⏩ 턴 스킵됨", "system");
+
+            // 🔥 [신규] 시간 단축 투표 토글
+            const handleTimeReductionToggle = async () => {
+                const timeVotes = roomData.gameState.timeVotes || {};
+                if (timeVotes[userId]) {
+                    await database.ref(`rooms/${roomId}/gameState/timeVotes/${userId}`).remove();
+                } else {
+                    await database.ref(`rooms/${roomId}/gameState/timeVotes/${userId}`).set(true);
+                }
             };
-            const handleGameTimeExpire = () => { if (roomData.hostId === userId) handleEndGame("시간 종료!"); };
+
+            const handleSkipTurn = async () => {
+                if (gameMode === 'liar') {
+                    handleLiarPassTurn();
+                } else {
+                    const { turnPlayer } = roomData.gameState;
+                    const playerIds = Object.keys(roomData.players);
+                    const candidates = playerIds.filter(id => id !== turnPlayer);
+                    const randomTarget = candidates[Math.floor(Math.random() * candidates.length)];
+                    await database.ref(`rooms/${roomId}/gameState`).update({ targetPlayer: null, turnPlayer: randomTarget, turnStartTime: Date.now() });
+                    sendMessageLocal("⏩ 턴 스킵됨", "system");
+                }
+            };
+
+            const handleLiarPassTurn = async () => {
+                const { turnOrder, currentTurnIndex, currentRound } = roomData.gameState;
+                const maxRounds = roomData.settings.rounds || 3;
+                let nextIndex = currentTurnIndex + 1;
+                let nextRound = currentRound;
+                if (nextIndex >= turnOrder.length) { nextIndex = 0; nextRound++; }
+                if (nextRound > maxRounds) { startVotingPhase(); } 
+                else {
+                    const nextPlayer = turnOrder[nextIndex];
+                    await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: nextPlayer, currentTurnIndex: nextIndex, currentRound: nextRound, turnStartTime: Date.now() });
+                }
+            };
+
+            const handleGameTimeExpire = () => { 
+                if (roomData.hostId === userId) {
+                    if (gameMode === 'spyfall') startVotingPhase();
+                } 
+            };
             const handleTurnTimeExpire = () => { if (roomData.hostId === userId) handleSkipTurn(); };
             const sendMessageLocal = (text, type='chat') => { database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text, timestamp: Date.now(), type }); };
+            
             const sendMessage = async (e) => {
                 e.preventDefault();
                 if (!chatInput.trim()) return;
+                
                 let msgType = 'chat';
                 if (roomData?.status === 'playing' && roomData.gameState) {
-                    if (roomData.gameState.turnPlayer === userId && !roomData.gameState.targetPlayer) msgType = 'question';
-                    else if (roomData.gameState.targetPlayer === userId) msgType = 'answer';
+                    if(gameMode === 'spyfall') {
+                        if (roomData.gameState.turnPlayer === userId && !roomData.gameState.targetPlayer) msgType = 'question';
+                        else if (roomData.gameState.targetPlayer === userId) msgType = 'answer';
+                    }
                 }
+
+                if (msgType === 'answer' && gameMode === 'spyfall') {
+                    setPendingAnswer(chatInput);
+                    return;
+                }
+
                 await database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text: chatInput, timestamp: Date.now(), type: msgType });
                 setChatInput('');
-                if (msgType === 'answer') { await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: userId, targetPlayer: null, turnStartTime: Date.now() }); }
             };
 
-            // 🔥 [추가] 방 코드 복사 핸들러
+            const confirmAnswer = async () => {
+                if (!pendingAnswer) return;
+                await database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text: pendingAnswer, timestamp: Date.now(), type: 'answer' });
+                await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: userId, targetPlayer: null, turnStartTime: Date.now() });
+                setChatInput('');
+                setPendingAnswer(null);
+            };
+
             const copyCode = async () => {
-                if (navigator.clipboard) {
-                    await navigator.clipboard.writeText(roomId);
-                    setShowToast(true);
-                    setTimeout(() => setShowToast(false), 2000);
-                } else {
-                    prompt("방 코드", roomId);
-                }
+                if (navigator.clipboard) { await navigator.clipboard.writeText(roomId); setShowToast(true); setTimeout(() => setShowToast(false), 2000); } 
+                else { prompt("방 코드", roomId); }
             };
 
-            // UI 렌더링
             if (!isFirebaseConfigured) return <div className="spy-bg flex items-center justify-center p-6 text-white font-bold">API KEY 설정 필요</div>;
 
             if (view === 'lobby') {
                 return (
                     <div className="spy-bg flex items-center justify-center p-4">
                         <div className="w-full max-w-sm glass-card p-6 rounded-3xl text-center shadow-2xl relative z-10">
-                            <div className="mb-6"><div className="text-5xl mb-2 animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">SPYFALL</h1></div>
+                            <button onClick={() => setShowRuleModal(true)} className="absolute top-4 right-4 bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors"><i data-lucide="book-open" className="w-5 h-5 text-yellow-400"></i></button>
+                            <div className="mb-6"><div className="text-5xl mb-2 animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">PARTY GAMES</h1></div>
                             <div className="space-y-3">
                                 <input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="닉네임" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-center font-bold" />
                                 <div className="pt-2 space-y-3">
@@ -554,6 +644,7 @@
                                 </div>
                             </div>
                         </div>
+                        {showRuleModal && <RuleModal onClose={() => setShowRuleModal(false)} mode="spyfall" />}
                     </div>
                 );
             }
@@ -566,60 +657,92 @@
                 const me = roomData.players[userId];
                 const gameState = roomData.gameState;
                 const isPlaying = roomData.status === 'playing';
-                const isMyTurnToAsk = isPlaying && gameState?.turnPlayer === userId && !gameState?.targetPlayer;
-                const isMyTurnToAnswer = isPlaying && gameState?.targetPlayer === userId;
+                const isVoting = roomData.status === 'voting';
+                const currentMode = roomData.settings.gameMode; 
+
+                const isMyTurnToAsk = isPlaying && currentMode === 'spyfall' && gameState?.turnPlayer === userId && !gameState?.targetPlayer;
+                const isMyTurnToAnswer = isPlaying && currentMode === 'spyfall' && gameState?.targetPlayer === userId;
+                const isMyLiarTurn = isPlaying && currentMode === 'liar' && gameState?.turnPlayer === userId;
 
                 let statusText = "대기 중...";
                 let placeholderText = "대화 참여...";
 
                 if (isPlaying && gameState) {
-                    if (!gameState.targetPlayer) {
+                    if (currentMode === 'liar') {
                         const tp = roomData.players[gameState.turnPlayer];
-                        statusText = `🗣️ ${tp?.name}님 질문 중`;
-                        if (isMyTurnToAsk) {
-                             const hasAsked = messages.some(m => m.uid === userId && m.type === 'question' && m.timestamp > gameState.turnStartTime);
-                             placeholderText = hasAsked ? "👉 상대를 지목하세요!" : "질문을 입력하세요";
-                        } else placeholderText = "질문자가 발언 중입니다";
+                        statusText = `🗣️ ${tp?.name}님 발언 중 (Round ${gameState.currentRound}/${roomData.settings.rounds})`;
+                        placeholderText = isMyLiarTurn ? "제시어를 설명하세요..." : "듣는 중...";
                     } else {
-                        const tp = roomData.players[gameState.targetPlayer];
-                        statusText = `💬 ${tp?.name}님 답변 중`;
-                        if (isMyTurnToAnswer) placeholderText = "답변을 입력하세요";
-                        else placeholderText = "답변자가 발언 중입니다";
+                        if (!gameState.targetPlayer) {
+                            const tp = roomData.players[gameState.turnPlayer];
+                            statusText = `🗣️ ${tp?.name}님 질문 중`;
+                            if (isMyTurnToAsk) {
+                                 const hasAsked = messages.some(m => m.uid === userId && m.type === 'question' && m.timestamp > gameState.turnStartTime);
+                                 placeholderText = hasAsked ? "👉 상대를 지목하세요!" : "질문을 입력하세요";
+                            } else placeholderText = "질문자가 발언 중입니다";
+                        } else {
+                            const tp = roomData.players[gameState.targetPlayer];
+                            statusText = `💬 ${tp?.name}님 답변 중`;
+                            if (isMyTurnToAnswer) placeholderText = "답변을 입력하세요";
+                            else placeholderText = "답변자가 발언 중입니다";
+                        }
                     }
+                } else if (isVoting) {
+                    statusText = "🚨 투표 진행 중...";
                 }
+
+                // 시간 단축 투표 카운트 계산
+                const timeVotes = gameState?.timeVotes ? Object.keys(gameState.timeVotes).length : 0;
+                const totalPlayers = players.length;
+                const hasVotedTime = gameState?.timeVotes?.[userId];
 
                 return (
                     <div className="spy-bg flex flex-row">
-                        {/* PC용 좌측 장소 리스트 */}
-                        <SideLocationPanel isLeft={true} />
-
-                        {/* 메인 게임 영역 */}
+                        <SideCheatSheet isLeft={true} mode={currentMode} />
                         <div className="flex-1 flex flex-col h-full max-w-xl mx-auto p-3 relative overflow-hidden">
-                            {/* 헤더 */}
                             <div className="glass-card p-2 rounded-xl mb-2 flex justify-between items-center shrink-0">
                                 <div><span className="text-[10px] text-gray-400 font-bold block">CODE</span><span className="text-lg font-black text-yellow-400 tracking-widest">{roomId}</span></div>
-                                <div className="text-sm font-bold text-white/90">{statusText}</div>
+                                <div className="text-sm font-bold text-white/90 truncate max-w-[150px]">{statusText}</div>
                                 <div className="flex gap-1">
                                     <button onClick={() => setShowLocationModal(true)} className="md:hidden bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-1 rounded text-xs font-bold">족보</button>
+                                    <button onClick={() => setShowRuleModal(true)} className="bg-yellow-500/10 text-yellow-300 border border-yellow-500/20 px-2 py-1 rounded text-xs font-bold">룰</button>
                                     <button onClick={copyCode} className="bg-white/10 px-3 py-1 rounded text-xs font-bold text-white border border-white/20 hover:bg-white/20 transition-colors">복사</button>
                                     <button onClick={leaveRoomCleanup} className="bg-red-500/20 text-red-400 border border-red-500/20 px-2 py-1 rounded text-xs font-bold">나가기</button>
                                 </div>
                             </div>
 
-                            {/* 대기실 (참여자 목록 추가) */}
-                            {!isPlaying && roomData.status === 'waiting' && (
+                            {!isPlaying && !isVoting && roomData.status === 'waiting' && (
                                 <div className="glass-card p-4 rounded-xl mb-2 overflow-y-auto">
+                                    <div className="flex justify-center mb-4">
+                                        <div className="bg-black/30 p-1 rounded-lg flex gap-1 border border-white/10">
+                                            <button onClick={() => isHost && handleUpdateSettings('mode', 'spyfall')} className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${gameMode === 'spyfall' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`} disabled={!isHost}>🕵️ 스파이폴</button>
+                                            <button onClick={() => isHost && handleUpdateSettings('mode', 'liar')} className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${gameMode === 'liar' ? 'bg-red-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`} disabled={!isHost}>🤥 라이어게임</button>
+                                        </div>
+                                    </div>
+
                                     <div className="flex gap-2 justify-center mb-4">
-                                        <div className="flex flex-col"><span className="text-[10px] text-gray-400 font-bold mb-1">게임 시간</span>
-                                        <select disabled={!isHost} value={gameTimeOpt} onChange={e => handleUpdateSettings('game', e.target.value)} className="bg-black/30 border border-white/10 rounded px-2 py-1 text-white text-xs w-20">
-                                            {[3,4,5,6,7,8,10,12,15].map(t => <option key={t} value={t}>{t}분</option>)}
-                                        </select></div>
+                                        {gameMode === 'spyfall' ? (
+                                            <div className="flex flex-col"><span className="text-[10px] text-gray-400 font-bold mb-1">게임 시간</span>
+                                            <select disabled={!isHost} value={gameTimeOpt} onChange={e => handleUpdateSettings('game', e.target.value)} className="bg-black/30 border border-white/10 rounded px-2 py-1 text-white text-xs w-16">
+                                                {[3,4,5,6,7,8,10,12,15].map(t => <option key={t} value={t}>{t}분</option>)}
+                                            </select></div>
+                                        ) : (
+                                            <div className="flex flex-col"><span className="text-[10px] text-gray-400 font-bold mb-1">라운드 수</span>
+                                            <select disabled={!isHost} value={roundsOpt} onChange={e => handleUpdateSettings('rounds', e.target.value)} className="bg-black/30 border border-white/10 rounded px-2 py-1 text-white text-xs w-16">
+                                                {[1,2,3,4,5,6].map(t => <option key={t} value={t}>{t}R</option>)}
+                                            </select></div>
+                                        )}
+                                        
                                         <div className="flex flex-col"><span className="text-[10px] text-gray-400 font-bold mb-1">턴 시간</span>
-                                        <select disabled={!isHost} value={turnTimeOpt} onChange={e => handleUpdateSettings('turn', e.target.value)} className="bg-black/30 border border-white/10 rounded px-2 py-1 text-white text-xs w-20">
-                                            {[15,20,30,40,50,60].map(t => <option key={t} value={t}>{t}초</option>)}
+                                        <select disabled={!isHost} value={turnTimeOpt} onChange={e => handleUpdateSettings('turn', e.target.value)} className="bg-black/30 border border-white/10 rounded px-2 py-1 text-white text-xs w-16">
+                                            {[20,30,40,50,60].map(t => <option key={t} value={t}>{t}초</option>)}
+                                        </select></div>
+                                        <div className="flex flex-col"><span className="text-[10px] text-gray-400 font-bold mb-1">최대 인원</span>
+                                        <select disabled={!isHost} value={maxPlayersOpt} onChange={e => handleUpdateSettings('max', e.target.value)} className="bg-black/30 border border-white/10 rounded px-2 py-1 text-white text-xs w-16">
+                                            {[3,4,5,6,7,8,9,10,11,12].map(t => <option key={t} value={t}>{t}명</option>)}
                                         </select></div>
                                     </div>
-                                    <div className="text-xs text-gray-400 font-bold mb-2">참여자 ({players.length})</div>
+                                    <div className="text-xs text-gray-400 font-bold mb-2">참여자 ({players.length}/{roomData.settings?.maxPlayers || 12})</div>
                                     <div className="grid grid-cols-3 gap-2 mb-4">
                                         {players.map(p => (
                                             <div key={p.uid} className="bg-white/5 p-2 rounded-lg text-center text-xs font-bold text-gray-300 border border-white/5">
@@ -633,10 +756,16 @@
                                 </div>
                             )}
 
-                            {/* 게임 중 UI */}
                             {isPlaying && gameState && (
                                 <div className="glass-card p-2 rounded-xl mb-2 shrink-0">
-                                    <TimerBar startTime={gameState.gameStartTime} duration={roomData.settings.gameDuration} onExpire={handleGameTimeExpire} label="전체 시간" colorClass="bg-indigo-500" showControl={isHost} onReduce={handleReduceGameTime} />
+                                    {currentMode === 'spyfall' ? (
+                                        <TimerBar startTime={gameState.gameStartTime} duration={roomData.settings.gameDuration} onExpire={handleGameTimeExpire} label="전체 시간" colorClass="bg-indigo-500" showControl={isHost} onReduce={handleReduceGameTime} />
+                                    ) : (
+                                        <div className="flex justify-between items-center text-xs font-bold text-gray-400 mb-2 px-1">
+                                            <span>ROUND {gameState.currentRound} / {roomData.settings.rounds}</span>
+                                            <span>진행중...</span>
+                                        </div>
+                                    )}
                                     <div className="mt-1 pt-1 border-t border-white/10 flex items-center gap-2">
                                         <div className="flex-1"><TimerBar startTime={gameState.turnStartTime} duration={roomData.settings.turnDuration} onExpire={handleTurnTimeExpire} label="턴 시간" colorClass="bg-orange-500" /></div>
                                         {isHost && <button onClick={handleSkipTurn} className="bg-white/10 px-2 py-1 rounded text-[10px] text-gray-300">스킵</button>}
@@ -649,11 +778,13 @@
                                     {players.map(p => {
                                         const isTurn = gameState.turnPlayer === p.uid && !gameState.targetPlayer;
                                         const isTarget = gameState.targetPlayer === p.uid;
-                                        const canSelect = isMyTurnToAsk && messages.some(m => m.uid === userId && m.type === 'question' && m.timestamp > gameState.turnStartTime) && p.uid !== userId;
+                                        const canSelect = currentMode === 'spyfall' && isMyTurnToAsk && messages.some(m => m.uid === userId && m.type === 'question' && m.timestamp > gameState.turnStartTime) && p.uid !== userId;
+                                        const isLiarSpeaker = currentMode === 'liar' && gameState.turnPlayer === p.uid;
+
                                         return (
-                                            <div key={p.uid} onClick={() => canSelect && handleSelectPlayer(p.uid)} className={`p-2 rounded-lg text-center relative border transition-all ${isTurn ? 'bg-blue-900/40 border-blue-500 shadow-lg' : isTarget ? 'bg-orange-900/40 border-orange-500 shadow-lg' : canSelect ? 'bg-white/10 border-white/30 cursor-pointer animate-pulse' : 'bg-black/20 border-white/5'}`}>
+                                            <div key={p.uid} onClick={() => canSelect && handleSelectPlayer(p.uid)} className={`p-2 rounded-lg text-center relative border transition-all ${isTurn || isLiarSpeaker ? 'bg-blue-900/40 border-blue-500 shadow-lg' : isTarget ? 'bg-orange-900/40 border-orange-500 shadow-lg' : canSelect ? 'bg-white/10 border-white/30 cursor-pointer animate-pulse' : 'bg-black/20 border-white/5'}`}>
                                                 <div className="text-xs font-bold truncate text-gray-300 flex items-center justify-center gap-1">{p.uid === roomData.hostId && <span className="text-yellow-400 text-[10px]">👑</span>}{p.name}{p.uid === userId && <span className="text-[10px] text-gray-500 ml-1">(나)</span>}</div>
-                                                {isTurn && <div className="text-[10px] text-blue-300 font-bold mt-1">질문 중</div>}
+                                                {(isTurn || isLiarSpeaker) && <div className="text-[10px] text-blue-300 font-bold mt-1">{currentMode === 'liar' ? '발언 중' : '질문 중'}</div>}
                                                 {isTarget && <div className="text-[10px] text-orange-300 font-bold mt-1">답변 중</div>}
                                                 {canSelect && <div className="text-[10px] text-white font-bold mt-1">👆 지목</div>}
                                             </div>
@@ -669,32 +800,49 @@
                             {isPlaying && (
                                 <div className="flex gap-2 shrink-0 mb-safe">
                                     <button onClick={() => setShowRoleModal(true)} className="flex-1 bg-white/5 py-3 rounded-xl text-sm font-bold border border-white/10">내 역할</button>
-                                    <button onClick={() => setShowVoteModal(true)} className="flex-1 bg-red-600/20 text-red-400 py-3 rounded-xl text-sm font-bold border border-red-500/30">투표하기</button>
+                                    
+                                    {/* 🔥 시간 단축 투표 버튼 */}
+                                    <button onClick={handleTimeReductionToggle} 
+                                        className={`flex-1 py-3 rounded-xl text-sm font-bold border transition-colors ${hasVotedTime ? 'bg-blue-600 border-blue-400 text-white' : 'bg-blue-900/30 border-blue-500/30 text-blue-300'}`}>
+                                        ⏱️ 시간 단축 {timeVotes}/{Math.ceil(players.length/2)}
+                                    </button>
+
+                                    {currentMode === 'liar' && isMyLiarTurn && (
+                                        <button onClick={handleLiarPassTurn} className="flex-1 bg-green-600 text-white py-3 rounded-xl text-sm font-bold shadow-lg animate-pulse">발언 종료</button>
+                                    )}
                                 </div>
                             )}
 
-                            {/* 🔥 [추가] 토스트 메시지 */}
                             {showToast && <Toast message="방 코드가 복사되었습니다!" />}
+
+                            {pendingAnswer && (
+                                <AnswerConfirmModal 
+                                    text={pendingAnswer} 
+                                    onConfirm={confirmAnswer} 
+                                    onCancel={() => setPendingAnswer(null)} 
+                                />
+                            )}
 
                             {showRoleModal && me && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6 modal-enter" onClick={() => setShowRoleModal(false)}>
                                     <div className={`w-full max-w-sm p-6 rounded-3xl text-center border-2 ${me.isSpy ? 'bg-red-950 border-red-500' : 'bg-slate-900 border-blue-500'}`} onClick={e => e.stopPropagation()}>
-                                        <div className="text-5xl mb-4">{me.isSpy ? '🕵️' : '📍'}</div>
-                                        <h2 className="text-2xl font-black text-white mb-2">{me.isSpy ? '당신은 스파이' : '시민 (장소 확인)'}</h2>
+                                        <div className="text-5xl mb-4">{me.isSpy ? (currentMode === 'liar' ? '🤥' : '🕵️') : '📍'}</div>
+                                        <h2 className="text-2xl font-black text-white mb-2">{me.isSpy ? (currentMode === 'liar' ? '당신은 라이어!' : '당신은 스파이!') : (currentMode === 'liar' ? '제시어 확인' : '장소 확인')}</h2>
                                         {!me.isSpy && <div className="text-2xl font-bold text-yellow-400 mb-1">{roomData.locationName}</div>}
-                                        <div className="text-sm text-gray-300">{me.role}</div>
+                                        <div className="text-sm text-gray-300">{currentMode === 'liar' && !me.isSpy ? '라이어에게 제시어를 들키지 마세요!' : me.role}</div>
                                         <button onClick={() => setShowRoleModal(false)} className="mt-6 w-full bg-white/10 py-3 rounded-xl font-bold">확인</button>
                                     </div>
                                 </div>
                             )}
                             
-                            {showLocationModal && <LocationModal onClose={() => setShowLocationModal(false)} />}
+                            {showLocationModal && <CheatSheetModal onClose={() => setShowLocationModal(false)} mode={currentMode} />}
+                            {showRuleModal && <RuleModal onClose={() => setShowRuleModal(false)} mode={currentMode} />}
                             
                             {isMyTurnToAsk && messages.some(m => m.uid === userId && m.type === 'question' && m.timestamp > gameState.turnStartTime) && (
                                 <PlayerSelectionModal players={players.filter(p => p.uid !== userId)} onSelect={handleSelectPlayer} />
                             )}
                             
-                            {showVoteModal && <VoteModal players={players} votes={roomData.votes} myVote={(roomData.votes || {})[userId]} onVote={handleVote} onClose={() => setShowVoteModal(false)} />}
+                            {(isVoting || showVoteModal) && <VoteModal players={players} votes={roomData.votes} myVote={(roomData.votes || {})[userId]} onVote={handleVote} onClose={() => setShowVoteModal(false)} mode={currentMode} />}
                             
                             {turnNotification && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6 modal-enter" onClick={() => setTurnNotification(null)}>
@@ -711,7 +859,7 @@
                                     <div className="glass-card w-full max-w-md rounded-3xl p-6 text-center">
                                         <h2 className="text-3xl font-black text-yellow-400 mb-2">GAME OVER</h2>
                                         <p className="text-white/60 mb-4">{roomData.endReason}</p>
-                                        <div className="bg-white/10 rounded-xl p-3 mb-4"><div className="text-xs text-gray-400">정답 장소</div><div className="text-2xl font-bold text-white">{roomData.locationName}</div></div>
+                                        <div className="bg-white/10 rounded-xl p-3 mb-4"><div className="text-xs text-gray-400">{currentMode === 'liar' ? '정답 제시어' : '정답 장소'}</div><div className="text-2xl font-bold text-white">{roomData.locationName}</div></div>
                                         <div className="flex gap-2">
                                             <button onClick={() => { setView('lobby'); setRoomId(''); }} className="flex-1 bg-gray-600 py-3 rounded-xl font-bold">나가기</button>
                                             {isHost && <button onClick={handleRestart} className="flex-1 bg-green-600 py-3 rounded-xl font-bold">다시 하기</button>}
@@ -720,9 +868,7 @@
                                 </div>
                             )}
                         </div>
-
-                        {/* PC용 우측 장소 리스트 */}
-                        <SideLocationPanel isLeft={false} />
+                        <SideCheatSheet isLeft={false} mode={currentMode} />
                     </div>
                 );
             }
