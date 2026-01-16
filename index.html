@@ -38,6 +38,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useLayoutEffect } = React;
 
+        // ✅ 사용자 설정값 (수정 X)
         const firebaseConfig = {
             apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM",
             authDomain: "spyfall-b107.firebaseapp.com",
@@ -49,6 +50,7 @@
             measurementId: "G-HYQR22H174"
         };
 
+        // Firebase 초기화
         let database = null;
         try {
             if (!firebase.apps.length) {
@@ -108,7 +110,7 @@
             return colors[Math.abs(hash) % colors.length];
         };
 
-        // UI Components
+        // --- UI Components ---
         const TimerBar = ({ startTime, duration, onExpire, label, colorClass, showControl, onReduce }) => {
             const [timeLeft, setTimeLeft] = useState(duration);
             const [progress, setProgress] = useState(100);
@@ -178,6 +180,60 @@
             );
         };
 
+        const FeedbackModal = ({ onClose }) => {
+            const [rating, setRating] = useState(5);
+            const [comment, setComment] = useState("");
+            const [submitted, setSubmitted] = useState(false);
+
+            const handleSubmit = async () => {
+                if(!database) return;
+                const newRef = database.ref('feedbacks').push();
+                await newRef.set({
+                    rating,
+                    comment,
+                    timestamp: Date.now(),
+                    date: new Date().toLocaleDateString()
+                });
+                setSubmitted(true);
+                setTimeout(onClose, 2000);
+            };
+
+            if (submitted) {
+                return (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-6 modal-enter">
+                        <div className="glass-card w-full max-w-sm rounded-3xl p-8 text-center border-2 border-green-500">
+                            <i data-lucide="check-circle" className="w-16 h-16 text-green-500 mx-auto mb-4"></i>
+                            <h2 className="text-2xl font-bold text-white mb-2">감사합니다!</h2>
+                            <p className="text-gray-400">소중한 의견이 전송되었습니다.</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 modal-enter" onClick={onClose}>
+                    <div className="glass-card w-full max-w-sm rounded-3xl p-6 relative border border-white/10" onClick={e => e.stopPropagation()}>
+                        <button onClick={onClose} className="absolute top-4 right-4 bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors"><i data-lucide="x" className="w-5 h-5"></i></button>
+                        <h2 className="text-2xl font-black text-white mb-6 text-center">⭐ 게임 평가하기</h2>
+                        <div className="flex justify-center gap-2 mb-6">
+                            {[1, 2, 3, 4, 5].map(star => (
+                                <button key={star} onClick={() => setRating(star)} className="text-3xl focus:outline-none transform transition-transform hover:scale-110">
+                                    {star <= rating ? '⭐' : '☆'}
+                                </button>
+                            ))}
+                        </div>
+                        <textarea 
+                            value={comment} 
+                            onChange={e => setComment(e.target.value)} 
+                            placeholder="버그 제보나 바라는 점을 적어주세요!"
+                            className="w-full h-32 bg-black/30 border border-white/20 rounded-xl p-3 text-white text-sm mb-4 focus:outline-none focus:border-blue-500 resize-none"
+                        />
+                        <button onClick={handleSubmit} className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold text-white shadow-lg">보내기</button>
+                    </div>
+                </div>
+            );
+        };
+
         const CheatSheetModal = ({ onClose, mode }) => {
             const data = mode === 'liar' ? LIAR_DATA : SPYFALL_DATA;
             const title = mode === 'liar' ? '주제별 제시어' : '장소 목록';
@@ -201,11 +257,8 @@
             );
         };
 
-        // 🔥 [신규] 스파이/라이어 맞히기 모달
         const FinalGuessModal = ({ mode, locationName, onGuess }) => {
             const [timeLeft, setTimeLeft] = useState(15);
-            // 라이어게임이면 해당 카테고리의 모든 제시어를 보여줘야 함
-            // 스파이폴이면 모든 장소 목록
             const list = mode === 'liar' 
                 ? (getLiarDataByCategory(locationName)?.words || []) 
                 : Object.values(SPYFALL_DATA).map(d => d.place);
@@ -273,14 +326,20 @@
             </div>
         );
 
+        // 🔥 [수정] 투표 모달 (투표 현황 추가)
         const VoteModal = ({ players, votes, myVote, onVote, onClose, mode }) => {
             const voteCounts = {};
             const villainName = mode === 'liar' ? '라이어' : '스파이';
+            const votedCount = Object.keys(votes || {}).length;
+            const totalPlayers = players.length;
+
             Object.values(votes || {}).forEach(targetId => { voteCounts[targetId] = (voteCounts[targetId] || 0) + 1; });
+            
             return (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center bg-red-900/90 p-4 modal-enter">
                     <div className="glass-card w-full max-w-md rounded-2xl p-6 border-red-500/30">
                         <h2 className="text-xl font-black text-red-400 mb-1 text-center">🚨 {villainName} 지목 투표</h2>
+                        <div className="text-center text-gray-400 text-xs mb-4 font-bold">투표 현황: {votedCount} / {totalPlayers}</div>
                         <div className="space-y-2 mb-4 max-h-[50vh] overflow-y-auto">
                             {players.map(p => {
                                 const count = voteCounts[p.uid] || 0;
@@ -321,7 +380,6 @@
             </div>
         );
 
-        // 🔥 [수정] 룰 업데이트 (라이어 역전승 등)
         const RuleModal = ({ onClose, mode }) => {
             const [tab, setTab] = useState(mode || 'spyfall'); 
             return (
@@ -417,8 +475,9 @@
             const [showLocationModal, setShowLocationModal] = useState(false);
             const [showRuleModal, setShowRuleModal] = useState(false);
             const [showVoteModal, setShowVoteModal] = useState(false);
+            const [showFeedbackModal, setShowFeedbackModal] = useState(false); 
             const [turnNotification, setTurnNotification] = useState(null);
-            const [pendingMsg, setPendingMsg] = useState(null); // { text, type }
+            const [pendingMsg, setPendingMsg] = useState(null); 
             const [gameTimeOpt, setGameTimeOpt] = useState(8);
             const [turnTimeOpt, setTurnTimeOpt] = useState(40);
             const [maxPlayersOpt, setMaxPlayersOpt] = useState(12);
@@ -427,10 +486,19 @@
             const [liarModeOpt, setLiarModeOpt] = useState('normal'); 
             const [showToast, setShowToast] = useState(false); 
             const [isChatExpanded, setIsChatExpanded] = useState(false);
+            const [visitorCount, setVisitorCount] = useState(0); 
             const lastTurnTimeRef = useRef(0);
 
+            useEffect(() => {
+                if (database) {
+                    const visitsRef = database.ref('analytics/total_visits');
+                    visitsRef.transaction(currentVisits => (currentVisits || 0) + 1);
+                    visitsRef.on('value', snap => setVisitorCount(snap.val() || 0));
+                }
+            }, []);
+
             useEffect(() => { if (nickname) localStorage.setItem('spyfall_nickname', nickname); }, [nickname]);
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, showRoleModal, showResultModal, roomData, showToast, showRuleModal, gameMode, pendingMsg, isChatExpanded]);
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [view, showRoleModal, showResultModal, roomData, showToast, showRuleModal, gameMode, pendingMsg, isChatExpanded, showFeedbackModal]);
 
             useEffect(() => {
                 if (roomData?.settings) {
@@ -453,7 +521,6 @@
                 }
             }, [roomData?.gameState?.timeVotes]);
 
-            // 🔥 투표 완료 시 로직 (스파이/라이어 모두 맞히기 단계 진입)
             useEffect(() => {
                 if (roomData?.votes && roomData?.status === 'voting') {
                     const players = Object.keys(roomData.players);
@@ -467,14 +534,11 @@
                         Object.entries(voteCounts).forEach(([uid, count]) => { if (count > maxVotes) { maxVotes = count; elected = uid; } });
                         
                         const electedPlayer = roomData.players[elected];
-                        // 스파이폴 or 라이어게임 공통: 빌런(스파이/라이어)이 잡히면 마지막 기회
-                        const isVillain = gameMode === 'spyfall' ? electedPlayer.isSpy : electedPlayer.isSpy; // 라이어도 isSpy 필드 사용
+                        const isVillain = gameMode === 'spyfall' ? electedPlayer.isSpy : electedPlayer.isSpy; 
 
                         if (isVillain) {
-                            // 검거 성공 -> 최후의 변론 (제시어/장소 맞히기)
                             database.ref('rooms/' + roomId).update({ status: 'final_guess', spyId: elected });
                         } else {
-                            // 시민 검거 -> 빌런 승리
                             handleEndGame(`시민(${electedPlayer.name})이 억울하게 지목되었습니다. ${gameMode === 'liar' ? '라이어' : '스파이'} 승리!`, gameMode === 'liar' ? 'liar' : 'spy');
                         }
                     }
@@ -558,7 +622,7 @@
             };
 
             const handleCreateRoom = async () => {
-                if (!database) return alert("API KEY가 설정되지 않았습니다.");
+                if (!database) return alert("Firebase 연결 오류");
                 if (!nickname.trim()) return alert('닉네임 필수');
                 const newId = generateRoomCode();
                 try {
@@ -638,7 +702,7 @@
                         role = isSpy ? 'SPY' : (roles.pop() || '시민');
                     }
                     
-                    // 결과 공개용 진짜 역할
+                    // 바보 라이어는 '시민'으로 위장 (결과 화면용 realRole)
                     const realRole = isSpy ? (isLiarMode ? (liarType === 'idiot' ? '바보라이어' : '라이어') : 'SPY') : (isLiarMode ? '시민' : role);
 
                     updatedPlayers[p.uid] = { 
@@ -700,7 +764,6 @@
                 try { await database.ref(`rooms/${roomId}/votes/${userId}`).set(targetUid); } catch(e) { console.error(e); }
             };
 
-            // 🔥 [신규] 스파이/라이어 정답 맞히기
             const handleFinalGuess = async (guess) => {
                 const isCorrect = guess === roomData.solution;
                 const villainName = gameMode === 'liar' ? '라이어' : '스파이';
@@ -766,7 +829,6 @@
                 if (!chatInput.trim()) return;
                 let msgType = 'chat';
                 
-                // 🔥 질문/답변 턴일 때 메시지 확인 모달 띄우기
                 if (roomData?.status === 'playing' && roomData.gameState) {
                     if(gameMode === 'spyfall') {
                         if (roomData.gameState.turnPlayer === userId && !roomData.gameState.targetPlayer) msgType = 'question';
@@ -774,12 +836,6 @@
                     }
                 }
 
-                if (gameMode === 'liar' && roomData.gameState.turnPlayer === userId) {
-                     // 라이어게임 발언 저장
-                    await database.ref(`rooms/${roomId}/players/${userId}`).update({ lastRemark: chatInput });
-                }
-
-                // 스파이폴 질문/답변이면 확인 모달
                 if ((msgType === 'answer' || msgType === 'question') && gameMode === 'spyfall') {
                     setPendingMsg({ text: chatInput, type: msgType });
                     return;
@@ -789,13 +845,11 @@
                 setChatInput('');
             };
 
-            // 🔥 [신규] 메시지 최종 전송
             const confirmMessage = async () => {
                 if (!pendingMsg) return;
                 await database.ref(`rooms/${roomId}/messages`).push({ sender: nickname, uid: userId, text: pendingMsg.text, timestamp: Date.now(), type: pendingMsg.type });
                 
                 if (pendingMsg.type === 'answer') {
-                    // 답변이면 턴 넘김
                     await database.ref(`rooms/${roomId}/gameState`).update({ turnPlayer: userId, targetPlayer: null, turnStartTime: Date.now() });
                 }
                 
@@ -825,6 +879,7 @@
                         <div className="w-full max-w-sm glass-card p-6 rounded-3xl text-center shadow-2xl relative z-10">
                             <button onClick={() => setShowRuleModal(true)} className="absolute top-4 right-4 bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors z-50"><i data-lucide="book-open" className="w-5 h-5 text-yellow-400"></i></button>
                             <div className="mb-6"><div className="text-5xl mb-2 animate-bounce">🕵️</div><h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500 tracking-tighter">PARTY GAMES</h1></div>
+                            <div className="text-xs font-bold text-gray-400 mb-4">누적 방문자: {visitorCount}명</div>
                             <div className="space-y-3">
                                 <input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="닉네임" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-center font-bold" />
                                 <div className="pt-2 space-y-3">
@@ -832,9 +887,11 @@
                                     <div className="flex gap-2 h-14"><input value={inputRoomId} onChange={e => setInputRoomId(e.target.value.toUpperCase())} placeholder="코드" className="w-24 bg-black/40 border border-white/10 rounded-xl px-2 text-center uppercase text-white font-black text-xl" />
                                     <button onClick={handleJoinRoom} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold">참가</button></div>
                                 </div>
+                                <button onClick={() => setShowFeedbackModal(true)} className="w-full bg-white/5 hover:bg-white/10 text-gray-400 py-2 rounded-xl text-xs font-bold">⭐ 평가하기</button>
                             </div>
                         </div>
                         {showRuleModal && <RuleModal onClose={() => setShowRuleModal(false)} mode="spyfall" />}
+                        {showFeedbackModal && <FeedbackModal onClose={() => setShowFeedbackModal(false)} />}
                     </div>
                 );
             }
@@ -986,9 +1043,6 @@
                                                 {(isTurn || isLiarSpeaker) && <div className="text-[10px] text-blue-300 font-bold mt-1">{currentMode === 'liar' ? '발언 중' : '질문 중'}</div>}
                                                 {isTarget && <div className="text-[10px] text-orange-300 font-bold mt-1">답변 중</div>}
                                                 {canSelect && <div className="text-[10px] text-white font-bold mt-1">👆 지목</div>}
-                                                {currentMode === 'liar' && p.lastRemark && (
-                                                    <div className="absolute -bottom-2 left-0 right-0 text-[9px] bg-white/20 text-white rounded px-1 truncate border border-white/10">"{p.lastRemark}"</div>
-                                                )}
                                             </div>
                                         )
                                     })}
@@ -1025,23 +1079,31 @@
                                 />
                             )}
 
+                            {/* 🔥 [수정] 역할 확인 모달 */}
                             {showRoleModal && me && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6 modal-enter" onClick={() => setShowRoleModal(false)}>
-                                    <div className={`w-full max-w-sm p-6 rounded-3xl text-center border-2 ${me.isSpy ? 'bg-red-950 border-red-500' : 'bg-slate-900 border-blue-500'}`} onClick={e => e.stopPropagation()}>
-                                        <div className="text-5xl mb-4">{me.isSpy ? (currentMode === 'liar' ? '🤥' : '🕵️') : '📍'}</div>
-                                        <h2 className="text-2xl font-black text-white mb-2">{me.isSpy ? (currentMode === 'liar' ? (me.isIdiot ? '제시어 확인' : '당신은 라이어!') : '당신은 스파이!') : (currentMode === 'liar' ? '제시어 확인' : '장소 확인')}</h2>
+                                    <div className={`w-full max-w-sm p-6 rounded-3xl text-center border-2 ${me.isSpy && !me.isIdiot ? 'bg-red-950 border-red-500' : 'bg-slate-900 border-blue-500'}`} onClick={e => e.stopPropagation()}>
+                                        <div className="text-5xl mb-4">{me.isSpy && !me.isIdiot ? (currentMode === 'liar' ? '🤥' : '🕵️') : '📍'}</div>
                                         
-                                        {!me.isSpy && <div className="text-2xl font-bold text-yellow-400 mb-1">{roomData.locationName}</div>}
+                                        {/* 타이틀: 바보 라이어는 '제시어 확인'으로 뜸 */}
+                                        <h2 className="text-2xl font-black text-white mb-2">
+                                            {currentMode === 'liar' 
+                                                ? (me.isSpy && !me.isIdiot ? '당신은 라이어!' : '제시어 확인') 
+                                                : (me.isSpy ? '당신은 스파이!' : '장소 확인')}
+                                        </h2>
                                         
-                                        {currentMode === 'liar' && (
-                                            <div>
-                                                {!me.isSpy && <div className="text-lg text-white font-bold">제시어: {me.role}</div>}
-                                                {me.isIdiot && <div className="text-lg text-white font-bold">제시어: {me.role}</div>}
-                                                {/* 시민에게만 카테고리 표시 */}
-                                                {!me.isSpy && <div className="text-xs text-gray-400 mt-1">카테고리: {roomData.locationName}</div>}
-                                            </div>
+                                        {/* 제시어/장소 표시 (큰 노란색) */}
+                                        {!me.isSpy && <div className="text-3xl font-bold text-yellow-400 mb-1">{currentMode === 'liar' ? me.role : roomData.locationName}</div>}
+                                        
+                                        {/* 바보 라이어: 가짜 제시어를 노란색으로 크게 표시 */}
+                                        {me.isIdiot && <div className="text-3xl font-bold text-yellow-400 mb-1">{me.role}</div>}
+
+                                        {/* 카테고리 표시 (작은 회색) - 라이어는 안 보임 */}
+                                        {currentMode === 'liar' && (!me.isSpy || me.isIdiot) && (
+                                            <div className="text-sm text-gray-400 mt-2">카테고리: {roomData.locationName}</div>
                                         )}
                                         
+                                        {/* 스파이폴 시민 역할 */}
                                         {currentMode === 'spyfall' && !me.isSpy && (
                                             <div className="text-sm text-gray-300 mt-2">당신의 역할: {me.role}</div>
                                         )}
@@ -1049,7 +1111,7 @@
                                         <div className="text-sm text-gray-300 mt-4">
                                             {currentMode === 'liar' && !me.isSpy && '라이어에게 제시어를 들키지 마세요!'}
                                             {currentMode === 'liar' && me.isSpy && !me.isIdiot && '당신은 라이어입니다. 눈치껏 연기하세요!'}
-                                            {currentMode === 'liar' && me.isIdiot && '당신은 시민입니다. (사실 바보 라이어!)'}
+                                            {currentMode === 'liar' && me.isIdiot && '당신은 시민입니다. 라이어를 찾아내세요!'}
                                             {currentMode === 'spyfall' && me.isSpy && '장소를 유추하세요!'}
                                         </div>
                                         
@@ -1088,6 +1150,7 @@
                                 </div>
                             )}
 
+                            {/* 🔥 [수정] 게임 종료 화면 (정답 미노출, 역할 간소화) */}
                             {roomData.status === 'finished' && (
                                 <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 p-6 modal-enter">
                                     <div className="glass-card w-full max-w-md rounded-3xl p-6 text-center">
@@ -1096,18 +1159,13 @@
                                         <p className="text-white/60 mb-4 text-xs">{roomData.endReason}</p>
                                         
                                         <div className="bg-white/10 rounded-xl p-4 mb-4 text-left">
-                                            <div className="flex justify-between items-center mb-3 pb-2 border-b border-white/10">
-                                                <span className="text-xs text-gray-400 font-bold">정답</span>
-                                                <span className="text-xl font-bold text-green-400">{currentMode === 'liar' ? roomData.solution : roomData.locationName}</span>
-                                            </div>
-                                            <div className="space-y-2 max-h-40 overflow-y-auto">
+                                            <div className="space-y-2 max-h-60 overflow-y-auto">
                                                 {players.map(p => (
                                                     <div key={p.uid} className={`flex justify-between text-sm p-2 rounded ${p.isSpy ? 'bg-red-500/20 text-red-200' : 'text-gray-300'}`}>
                                                         <span>{p.name}</span>
                                                         <span className="font-bold">
-                                                            {p.realRole} 
-                                                            {p.isIdiot && <span className="text-[10px] ml-1">(바보)</span>}
-                                                            {currentMode === 'liar' && p.isSpy && p.isIdiot && <span className="text-[10px] text-gray-400 block">{roomData.liarSolution}</span>}
+                                                            {/* 바보 라이어는 그냥 '바보 라이어'로만 표시 */}
+                                                            {p.isIdiot ? '바보 라이어' : p.realRole}
                                                         </span>
                                                     </div>
                                                 ))}
@@ -1117,6 +1175,7 @@
                                         <div className="flex gap-2">
                                             <button onClick={() => { setView('lobby'); setRoomId(''); }} className="flex-1 bg-gray-600 py-3 rounded-xl font-bold">나가기</button>
                                             {isHost && <button onClick={handleRestart} className="flex-1 bg-green-600 py-3 rounded-xl font-bold">다시 하기</button>}
+                                            <button onClick={() => setShowFeedbackModal(true)} className="flex-1 bg-white/5 py-3 rounded-xl font-bold border border-white/20">⭐ 평가</button>
                                         </div>
                                     </div>
                                 </div>
