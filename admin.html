@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 대시보드 - 피드백</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'); body { font-family: 'Pretendard', sans-serif; }</style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-2">📊 관리자 대시보드</h1>
+        <p class="text-gray-400 mb-8">유저들이 남긴 피드백을 모아봅니다.</p>
+
+        <div class="grid grid-cols-3 gap-4 mb-8">
+            <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <div class="text-gray-400 text-sm">총 피드백 수</div>
+                <div class="text-4xl font-bold text-blue-400" id="totalCount">0</div>
+            </div>
+            <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <div class="text-gray-400 text-sm">평균 별점</div>
+                <div class="text-4xl font-bold text-yellow-400" id="avgRating">0.0</div>
+            </div>
+            <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <div class="text-gray-400 text-sm">누적 방문자</div>
+                <div class="text-4xl font-bold text-green-400" id="visitorCount">0</div>
+            </div>
+        </div>
+
+        <h2 class="text-xl font-bold mb-4">📝 최근 후기 목록</h2>
+        <div id="feedbackList" class="space-y-4">
+            <div class="text-center text-gray-500 py-10">데이터 불러오는 중...</div>
+        </div>
+    </div>
+
+    <script>
+        // 👇 관리자 접속 암호 설정 (원하는 걸로 바꾸세요)
+        const ADMIN_PASSWORD = "yushi0405!"; 
+
+        const password = prompt("관리자 비밀번호를 입력하세요.");
+        if (password !== ADMIN_PASSWORD) {
+            alert("접근 권한이 없습니다.");
+            location.href = "index.html"; // 비밀번호 틀리면 메인으로 쫓아냄
+        }
+
+        // ✅ 본인 설정값으로 덮어쓰세요!
+        const firebaseConfig = {
+            apiKey: "AIzaSyDvtMrhYYEqpJEjwhBzEiyKgBhmcoLKROM",
+            authDomain: "spyfall-b107.firebaseapp.com",
+            databaseURL: "https://spyfall-b107-default-rtdb.firebaseio.com",
+            projectId: "spyfall-b107",
+            storageBucket: "spyfall-b107.firebasestorage.app",
+            messagingSenderId: "35799604494",
+            appId: "1:35799604494:web:9558db68aa6c5347d60b5f",
+            measurementId: "G-HYQR22H174"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // 방문자 수 가져오기
+        db.ref('analytics/total_visits').on('value', snap => {
+            document.getElementById('visitorCount').innerText = snap.val() || 0;
+        });
+
+        // 피드백 가져오기
+        db.ref('feedbacks').on('value', snap => {
+            const data = snap.val();
+            const listEl = document.getElementById('feedbackList');
+            listEl.innerHTML = '';
+
+            if (!data) {
+                listEl.innerHTML = '<div class="text-center text-gray-500 py-10">아직 등록된 후기가 없습니다.</div>';
+                return;
+            }
+
+            const items = Object.values(data).reverse(); // 최신순 정렬
+            
+            // 통계 계산
+            document.getElementById('totalCount').innerText = items.length;
+            const avg = items.reduce((acc, cur) => acc + cur.rating, 0) / items.length;
+            document.getElementById('avgRating').innerText = avg.toFixed(1);
+
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'bg-gray-800 p-5 rounded-xl border border-gray-700 flex gap-4';
+                div.innerHTML = `
+                    <div class="text-3xl">${item.rating >= 4 ? '😍' : (item.rating >= 3 ? '🙂' : '🤬')}</div>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-yellow-400 font-bold">${'⭐'.repeat(item.rating)}</span>
+                            <span class="text-xs text-gray-500">${item.date}</span>
+                        </div>
+                        <p class="text-gray-300 text-sm leading-relaxed">${item.comment || '<span class="text-gray-600">(내용 없음)</span>'}</p>
+                    </div>
+                `;
+                listEl.appendChild(div);
+            });
+        });
+    </script>
+</body>
+</html>
